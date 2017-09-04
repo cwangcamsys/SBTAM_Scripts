@@ -197,6 +197,10 @@ DBox "SCAG Dashboard"
         
         
         RunMacro("Update")
+		
+        UT = null
+		UT = CreateObject("Utilities")
+        self.UT = UT		
         
     EndItem
     //EndMethod
@@ -736,13 +740,15 @@ DBox "SCAG Dashboard"
         //Load performance report object
         SetAlternateInterface(perf_ui)
         InstPerf = null
-        InstPerf = CreateObject("Performance")
-		
-		RunDbox("Performance", InstPerf, scenario_list[DashScen], Args)
+        InstPerf = CreateObject("Performance", Args, ScenArr[DashScen][3]) //Args, selected scenario name and scenario directory
+		RunDbox("Performance", InstPerf, ScenArr[DashScen][1], ScenArr[DashScen][3])	//Args, selected scenario name and scenario directory
         SetAlternateInterface()
 		
+        ret_value = InstPerf.CreateReport()
+        if !ret_value then goto quit		
+		
+		quit:
         RunMacro("TCB Closing", ret_value, !ret_value)
-        
 		ShowDbox()
     enditem	
 	
