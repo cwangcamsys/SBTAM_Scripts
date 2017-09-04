@@ -28,7 +28,7 @@
 // NOTE: If values here change, many columns will also need to be updated (search fore colhead).
 // ****************************************************************************************************************
 //      
-Dbox "Performance" (Perf, ScenName, ScenDir)
+Dbox "Performance" (Perf)
 
     init do
         //Use a settings buffer to allow the user to cancel changes
@@ -38,7 +38,7 @@ Dbox "Performance" (Perf, ScenName, ScenDir)
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //  Information about scenario and output file
     text "Scenario: " 1,1,10,1
-    text "Scenario Name" 11, 1, 79 framed Variable: ScenName
+    text "Scenario Name" 11, 1, 79 framed Variable: Perf.Args.Info.Name
     text "Output: " 1, 3, 10
     text "Report filename" 11, 3, 79, 1  framed variable: Perf.File
     
@@ -163,12 +163,11 @@ Dbox "Performance" (Perf, ScenName, ScenDir)
 
 EndDbox
 
-Class "Performance" (Args, ScenDir) //StartClass
+Class "Performance" (Args) //StartClass
 
     init do
     //StartMethod
         shared UT
-		//shared ScenDir
 
         t = SplitPath(GetInterface())
         ui_dir = t[1] + t[2]
@@ -376,7 +375,7 @@ Class "Performance" (Args, ScenDir) //StartClass
 		       
         
         //Identify report filename
-		self.File = ScenDir + "Reports\\Performance_Report.html"
+		self.File = self.Args.Info.ModelDir + "Reports\\Performance_Report.html"
         
         // ---------------------------------------------------------------------
         // the remainder should rarely be changed
@@ -1484,7 +1483,6 @@ EndClass
 Macro "RPT Title Page" (Perf)
     
     shared UT
-	shared ScenName, ScenDir
 
 	if Perf.Formats.Filetype = 'html' then do
 
@@ -1494,8 +1492,7 @@ Macro "RPT Title Page" (Perf)
 		WriteLine(fp,'<h1>SBTAM Summary Report</h1>')
         WriteLine(fp,'<div class="indent_h1">')
 		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Scenario Name: </span>' + Perf.Args.Info.Name + '</div>')
-		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Input Directory: </span>' + Perf.Args.Info.[Input Directory] + '</div>')
-		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Output Directory: </span>' + Perf.Args.Info.[Output Directory] + '</div>')
+		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Model Directory: </span>' + Perf.Args.Info.ModelDir + '</div>')
 		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Report File: </span>' + Perf.File + '</div>')
 		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Report Created on: </span>' + UT.FormatDate() + '</div>')
 		WriteLine(fp,'<div class="titleInfo"><span class="blueText">Scenario Description: </span>' + Perf.Args.Info.Description + '</div>')

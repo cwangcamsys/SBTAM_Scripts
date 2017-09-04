@@ -319,6 +319,9 @@ DBox "SCAG Dashboard"
         ScenName = scenario_list[DashScen]
         // Args = ScenArr.(ScenName)
 		Args = RunMacro("TCP Convert to Argument Options", ScenArr[DashScen][5])	
+		Args.Info.Name = ScenName
+		Args.Info.ModelDir = ScenArr[DashScen][3]
+		Args.Info.Description = ScenArr[DashScen][4]
 
 		//Update mapper and dialog box variables with the current scenario
 		RunMacro("SetScenario")		
@@ -740,9 +743,9 @@ DBox "SCAG Dashboard"
         //Load performance report object
         SetAlternateInterface(perf_ui)
         InstPerf = null
-        InstPerf = CreateObject("Performance", Args, ScenArr[DashScen][3]) //Args, selected scenario name and scenario directory
-		RunDbox("Performance", InstPerf, ScenArr[DashScen][1], ScenArr[DashScen][3])	//Args, selected scenario name and scenario directory
-        SetAlternateInterface()
+		InstPerf = CreateObject("Performance", Args) //Args, selected scenario name and scenario directory
+        RunDbox("Performance", InstPerf)
+		SetAlternateInterface()
 		
         ret_value = InstPerf.CreateReport()
         if !ret_value then goto quit		
