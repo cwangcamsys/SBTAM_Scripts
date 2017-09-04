@@ -28,7 +28,7 @@
 // NOTE: If values here change, many columns will also need to be updated (search fore colhead).
 // ****************************************************************************************************************
 //      
-Dbox "Performance" (Perf)
+Dbox "Performance" (Perf, scenario_name, Args)
 
     init do
         //Use a settings buffer to allow the user to cancel changes
@@ -38,7 +38,7 @@ Dbox "Performance" (Perf)
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //  Information about scenario and output file
     text "Scenario: " 1,1,10,1
-    text "Scenario Name" 11, 1, 79 framed Variable: Perf.Args.Info.Name
+    text "Scenario Name" 11, 1, 79 framed Variable: scenario_name
     text "Output: " 1, 3, 10
     text "Report filename" 11, 3, 79, 1  framed variable: Perf.File
     

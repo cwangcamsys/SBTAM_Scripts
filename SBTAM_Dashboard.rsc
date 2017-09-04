@@ -59,7 +59,7 @@ DBox "SCAG Dashboard"
         shared ScenArr, ScenFlag
 		
 		//Start of SCAG revisions
-		Shared ScenArr, ScenSel, ModelInfo, StageInfo, MacroInfo, ScenNames, ui_file
+		Shared ScenArr, ScenSel, ModelInfo, StageInfo, MacroInfo, ScenName, ui_file
 		Shared ScenFlag, Args, scenario_list, DashScen, logo_bmp
 
 		ui_file = GetInterface()
@@ -290,8 +290,8 @@ DBox "SCAG Dashboard"
     //
     //    //Update Args to reference the current scenario
     //    ScenFlag = {scen_active}
-    //    scenario_name = scen_list[scen_active]
-    //    Args = ScenArr.(scenario_name)
+    //    ScenName = scen_list[scen_active]
+    //    Args = ScenArr.(ScenName)
     //    
     //    //Update mapper and dialog box variables with the current scenario
     //    RunMacro("SetScenario")
@@ -312,8 +312,8 @@ DBox "SCAG Dashboard"
         
 		//Update Args to reference the current scenario
         ScenFlag = {DashScen}
-        scenario_name = scenario_list[DashScen]
-        // Args = ScenArr.(scenario_name)
+        ScenName = scenario_list[DashScen]
+        // Args = ScenArr.(ScenName)
 		Args = RunMacro("TCP Convert to Argument Options", ScenArr[DashScen][5])	
 
 		//Update mapper and dialog box variables with the current scenario
@@ -720,6 +720,35 @@ DBox "SCAG Dashboard"
         DisableItem("SelectCreate")
     enditem
     
+	
+    //StartMethod //Performace Report
+    tab "PerformaceReport" prompt: "Report"
+    //EndMethod - Performace Report
+    
+    //StartMethod //Performace Report Create button 
+    button "ReportCreate" 2, 8, 30, 2 prompt: "Specify Performance Report >>"
+        help: "Create a model summary report" do
+		
+		//shared ScenName
+        
+		HideDbox()
+        RunMacro("TCB Init")
+        //Load performance report object
+        SetAlternateInterface(perf_ui)
+        InstPerf = null
+        InstPerf = CreateObject("Performance")
+		
+		RunDbox("Performance", InstPerf, scenario_list[DashScen], Args)
+        SetAlternateInterface()
+		
+        RunMacro("TCB Closing", ret_value, !ret_value)
+        
+		ShowDbox()
+    enditem	
+	
+	
+
+	
     //Macro to set the select link map type
     macro "SetSelectType" do
     
@@ -1898,7 +1927,7 @@ Dbox "SelectCompare" title: "Comparison Map"                                //**
         
         //Get selected scenario flow file for reference
         //Args = ScenArr[ScenFlag[1]][2]
-		scenario_name = scenario_list[DashScen]
+		ScenName = scenario_list[DashScen]
         //scen_flow = Args.Output.PST.DailyFlow.Value
 		scen_flow = Args.[Hwy Day Final Flow Table]
         
