@@ -120,8 +120,8 @@ Dbox "Performance" (Perf)
     
 	checkbox "Entire Model" 3, 29,   15, 1 
         Variable: sets.SumArea.[Entire Model]
-	checkbox "City SOI" 3, 30.5, 15, 1 
-        Variable: sets.SumArea.[City SOI]
+	checkbox "SB County" 3, 30.5, 15, 1 
+        Variable: sets.SumArea.[SB County]
 	checkbox "Custom 1" 3, 32, 15, 1 
         Variable: sets.SumArea.[Custom 1]
 	checkbox "Custom 2" 3, 33.5,   15, 1  
@@ -178,25 +178,25 @@ Class "Performance" (Args) //StartClass
 
         //FT values
         self.Info.FT = {{"Freeway",              					1},   //Note - Freeway MUST be first to produce a correct screenline report.
-                        {"Major Arterial",       					3},
-                        {"Minor Arterial",       					4},
-                        {"Major Collector",            				5},
-                        {"Ramps",       							6},
-			            {"Urban Local",       						7},
-                        {"Highway (Outside SOI)",   				11},
-			            {"Arterial (Outside SOI)",   				12},
-			            {"Rural Arterial (Outside SOI)",   			13},
-			            {"Walk Only Centroid Connectors",			49},
-			            {"Centroid Connectors",						50},
-			            {"Transit Local",							51}}
+                        {"HOV",										2},
+						{"Expressway/Parkway",						3},
+						{"Principal Arterial",						4},
+                        {"Minor Arterial",       					5},
+                        {"Major Collector",            				6},
+						{"Minor Collector",							7},
+                        {"Ramps",       							8},
+						{"Truck Lanes",								9},
+			            {"Centroid Connectors",						10}}
+			           // {"Transit Local",							999}}
         
         //AT values
-        self.Info.AT = {{"CBD", 		1},
-                        {"Fringe", 		2},
-                        {"Urban", 		3},
-                        {"Suburban", 	4},
-                        {"Rural", 		5},
-			            {"Outside SOI", 6}}
+        self.Info.AT = {{"Core", 						1},
+						{"Central Business District",	2},
+						{"Urban Business District", 	3},
+                        {"Urban", 						4},
+                        {"Suburban", 					5},
+                        {"Rural", 						6},
+			            {"Mountain", 					7}}
 
         //Default format settings
         self.Formats = null
@@ -267,15 +267,15 @@ Class "Performance" (Args) //StartClass
         //Define summary areas
         self.SumArea = null
         
-        self.SumArea.[Entire Model].Query = "Select * where AT => 0"
+        self.SumArea.[Entire Model].Query = "Select * where AB_AreaType >= 0"	//SCAG
         self.SumArea.[Entire Model].Network = True
         self.SumArea.[Entire Model].Zones = True
         self.SumArea.[Entire Model].Active = False
         
-        self.SumArea.[City SOI].Query = "Select * where AT < 6"
-        self.SumArea.[City SOI].Network = True
-        self.SumArea.[City SOI].Zones = True
-        self.SumArea.[City SOI].Active = False
+        self.SumArea.[SB County].Query = "Select * where County = 5"
+        self.SumArea.[SB County].Network = True
+        self.SumArea.[SB County].Zones = True
+        self.SumArea.[SB County].Active = False
         
         self.SumArea.[Custom 1].Query = "Select * Where CUSTOM1 = 1"
         self.SumArea.[Custom 1].Network = True
@@ -1644,7 +1644,7 @@ Macro "RPT Network Summary" (Perf)
     areas = Perf.ActiveAreas("Network")  //Can be Network or Zones
     
     //Define files
-    dbd_file = Perf.Args.Output.INI.RdNetwork.Value
+    dbd_file = Perf.Args.[Highway DB]
 
     //Dimension arrays to hold data: TableXXX[area][ft(row)][at(col)]
     dim TablesCL[areas.length]
@@ -1663,6 +1663,10 @@ Macro "RPT Network Summary" (Perf)
         area_name = areas[_area][1]
         area_qry = areas[_area][2]
         SetView(link_lyr)
+		
+		// Create formula field FT based on AB_Facility_Type
+		CreateExpression(link_lyr, "FT", "if CC = 1 then 10 else (if AB_Facility_Type<100 then  floor(AB_Facility_Type/10) else 99)", ) 	// SCAG: Need to add the field "CC" in the highway network
+		
         //Do not report disabled links
         setcount = SelectByQuery("SummaryArea", "Several", 
                                  "Select * Where FT > 0", )
@@ -1673,8 +1677,8 @@ Macro "RPT Network Summary" (Perf)
             //Load data from view
             {FTv, ATv, CLv, 
             ABLANESv, BALANESv} = GetDataVectors(link_lyr+"|SummaryArea", 
-                                  {"FT", "AT", "Length", 
-                                  "AB_LANE", "BA_LANE"}, )
+                                  {"FT", "AB_AreaType", "Length", 				//SCAG: use AB_AreaType as the area type
+                                  "AB_AMLANES", "BA_AMLANEs"}, )				//SCAG: use [AB/BA]-AMLANES as the number of lanes
                                   
             //Math
             LANESv = nz(ABLANESv) + nz(BALANESv)
