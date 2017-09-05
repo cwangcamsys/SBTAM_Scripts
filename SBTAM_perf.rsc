@@ -3008,15 +3008,15 @@ Macro "Vehicle Validation" (Perf, per)
     areas = Perf.ActiveAreas("Network")  //Can be Network or Zones
     
     //Define files
-    dbd_file = Perf.Args.Output.INI.RdNetwork.Value
+    dbd_file = Perf.Args.[Highway DB]
     if per = "DY" then do
-        flow_file = Perf.Args.Output.PST.DailyFlow.Value //daily flows only
+        flow_file = Perf.Args.[Hwy Day Final Flow Table] //daily flows only
         c_fld = "FIN_CNT"       //count field
     end else if per = "AM" then do
-        flow_file = Perf.Args.Output.ASN.AMflow.Value //daily flows only
+        flow_file = Perf.Args.[Hwy AM Final Flow Table] //daily flows only
         c_fld = "AM_CNT"       //count field
     end else if per = "PM" then do
-        flow_file = Perf.Args.Output.ASN.PMflow.Value //daily flows only
+        flow_file = Perf.Args.[Hwy PM Final Flow Table] //daily flows only
         c_fld = "PM_CNT"       //count field
     end
     
@@ -3064,7 +3064,13 @@ Macro "Vehicle Validation" (Perf, per)
     layers = RunMacro("TCB get DB line and node layers", dbd_file)
     node_lyr = layers[1]
     link_lyr = layers[2]
-    
+	
+    SetView(link_lyr)
+	// Create formula field FT based on AB_Facility_Type
+	CreateExpression(link_lyr, "FT", "if CC = 1 then 10 else (if AB_Facility_Type<100 then  floor(AB_Facility_Type/10) else 99)", ) 	// SCAG: Need to add the field "CC" in the highway network
+    CreateExpression(link_lyr, "AT", "AB_AreaType", ) 	// SCAG: use AB_AreaType as AT
+	
+	
     //Open and join flows
     flow_vw = OpenTable("Flow", "FFB", {flow_file,})
     join_vw = JoinViews("Network+Flow", link_lyr+".ID", flow_vw+".ID1", )

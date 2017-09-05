@@ -744,11 +744,13 @@ DBox "SCAG Dashboard"
         SetAlternateInterface(perf_ui)
         InstPerf = null
 		InstPerf = CreateObject("Performance", Args) //Args, selected scenario name and scenario directory
-        RunDbox("Performance", InstPerf)
+        Create_Report = RunDbox("Performance", InstPerf)	//Boolean variable, whether to create the performance report 
 		SetAlternateInterface()
 		
-        ret_value = InstPerf.CreateReport()
-        if !ret_value then goto quit		
+        if Create_Report then do 					
+			ret_value = InstPerf.CreateReport()
+			if !ret_value then goto quit
+		end	
 		
 		quit:
         RunMacro("TCB Closing", ret_value, !ret_value)
