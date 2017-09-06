@@ -1852,16 +1852,17 @@ Macro "RPT Trip Generation" (Perf)
 	// Create formula field "County" based on "CNTY", used to define area
 	CreateExpression(socio_vw, "County", "if CNTY = 'Imperial' then 1 else (if CNTY = 'Los Angeles' then 2 else (if CNTY = 'Orange' then 3 else (if CNTY = 'Riverside' then 4 else (if CNTY = 'San Bernardino' then 5 else (if CNTY = 'Ventura' then 6 else 99)))))", ) 	// SCAG
     
-    //Summarize by area, bal/unbal
 	//SCAG: Summarize by area, bal for PK and OP
     for _area = 1 to areas.length do
-        for bal = 1 to 2 do
         
-            //Dimension TableData
-            dim Data[purp_names2.length, 6] //cols: (1)prod, (2)attr, (3)p/HH, (4)p/POP, (5)% P, (6)% A
-            //Load bal/unbal data
-            pa_vw = OpenTable("PA", "FFB", {pa_files[bal],})
-            join_vw = JoinViews("Join", pa_vw+"."+pa_id[bal], socio_vw+".SubregionTAZ", )
+		//Dimension TableData
+		dim Data[purp_names2.length, 6] //cols: (1)prod, (2)attr, (3)p/HH, (4)p/POP, (5)% P, (6)% A
+		
+		for _pkop = 1 to 2 do
+
+			//Load _pkop/un_pkop data
+            pa_vw = OpenTable("PA", "FFB", {pa_files[_pkop],})
+            join_vw = JoinViews("Join", pa_vw+"."+pa_id[_pkop], socio_vw+".SubregionTAZ", )
             SetView(join_vw)
             
             //and apply selection set
@@ -1880,8 +1881,8 @@ Macro "RPT Trip Generation" (Perf)
                 for _purp = 1 to purp_names2.length do
                     purp = purp_names2[_purp]
                     {P, A} = GetDataVectors(join_vw+"|Local", {purp+"_P", purp+"_A"}, )
-                    Data[_purp][1] = VectorStatistic(P, "Sum", )
-                    Data[_purp][2] = VectorStatistic(A, "Sum", )
+                    Data[_purp][1] = nz(Data[_purp][1]) + VectorStatistic(P, "Sum", )
+                    Data[_purp][2] = nz(Data[_purp][2]) + VectorStatistic(A, "Sum", )
                     Data[_purp][3] = Data[_purp][1] / hh
                     Data[_purp][4] = Data[_purp][1] / pop
                     
@@ -1891,52 +1892,56 @@ Macro "RPT Trip Generation" (Perf)
                 
                 end //_purp
                 
-                //Add totals row
-                Data = Data + {{p_tot, a_tot, p_tot / hh, p_tot / pop, , }}
                 
-                //Get percentages of totals, 
-                for _purp = 1 to Data.length do
-                    Data[_purp][5] = Data[_purp][1] / p_tot
-                    Data[_purp][6] = Data[_purp][2] / a_tot
-                end
+				if _pkop = 2 then do 			// only calculate totals and save table for writing when _pkop = 2 (op), Data[_purp][1] (productions) and Data[_purp][2] (attractions) are accumulating (PK + OP)
+				
+					//Add totals row
+					Data = Data + {{p_tot, a_tot, p_tot / hh, p_tot / pop, , }}
+					
+					//Get percentages of totals, 
+					for _purp = 1 to Data.length do
+						Data[_purp][5] = Data[_purp][1] / p_tot
+						Data[_purp][6] = Data[_purp][2] / a_tot
+					end
+					
+					//Create cell format overrides
+					for _purp = 1 to Data.length do
+						cell_fmt = cell_fmt + {{, , "*0.00", "*0.00", "*0.0%", "*0.0%"}}
+					end
                 
-                //Create cell format overrides
-                for _purp = 1 to Data.length do
-                    cell_fmt = cell_fmt + {{, , "*0.00", "*0.00", "*0.0%", "*0.0%"}}
-                end
-                
-                
-                //Save table for writing
-                TB = null
-                basic_name = if bal = 1 then "Balanced Trips" else "Unbalanced Trips"
-                TB.Name = basic_name + ' <span class="grey">('+areas[_area][1]+')</span>'
-                TB.Section1 = areas[_area][1]
-                if bal > 1 then TB.Section2 = "Additional Details"
-                TB.Table.TableData = CopyArray(Data)
-                TB.Table.RowNames = purp_names2a + {"All Trips"}
-                TB.Table.ColNames = {"Purpose", "Productions", "Attractions", "Productions/HH", "Productions/Pop", "% of Productions", "% of Attractions"}
-                TB.Table.Formats = cell_fmt
-                TB.Table.Class = "dataframe no-last-col"
-                
-                Tables = Tables + {CopyArray(TB)}
-            
-                //Add a chart
-                txData = TransposeArray(Data)
-                chP = Subarray(txData[1], 1, txData[1].length-1)
-                chA = Subarray(txData[2], 1, txData[2].length-1)
-                
-                CH = null
-                basic_name = if bal = 1 then "Balanced Trips Chart" else "Unbalanced Trips Chart"
-                CH.Name = basic_name + ' <span class="grey">('+areas[_area][1]+')</span>'
-                CH.Section1 = areas[_area][1]
-                if bal > 1 then CH.Section2 = "Additional Details"
-                CH.Chart.CanvasID = 'chart_'+Substitute(basic_name+"_"+areas[_area][1], " ", "_",)
-                CH.Chart.Type = 'bar'
-                CH.Chart.Labels = purp_names
-                CH.Chart.Data = {chP, chA}
-                CH.Chart.Names = {"Productions", "Attractions"}
-                
-                Tables = Tables + {CopyArray(CH)}
+					//Save table for writing
+					TB = null
+					basic_name = "Balanced Trips"
+					TB.Name = basic_name + ' <span class="grey">('+areas[_area][1]+')</span>'
+					TB.Section1 = areas[_area][1]
+					if _pkop > 1 then TB.Section2 = "Additional Details"
+					TB.Table.TableData = CopyArray(Data)
+					TB.Table.RowNames = purp_names2a + {"All Trips"}
+					TB.Table.ColNames = {"Purpose", "Productions", "Attractions", "Productions/HH", "Productions/Pop", "% of Productions", "% of Attractions"}
+					TB.Table.Formats = cell_fmt
+					TB.Table.Class = "dataframe no-last-col"
+					
+					Tables = Tables + {CopyArray(TB)}
+				
+					//Add a chart
+					txData = TransposeArray(Data)
+					chP = Subarray(txData[1], 1, txData[1].length-1)
+					chA = Subarray(txData[2], 1, txData[2].length-1)
+					
+					CH = null
+					basic_name = "Balanced Trips"
+					CH.Name = basic_name + ' <span class="grey">('+areas[_area][1]+')</span>'
+					CH.Section1 = areas[_area][1]
+					if _pkop > 1 then CH.Section2 = "Additional Details"
+					CH.Chart.CanvasID = 'chart_'+Substitute(basic_name+"_"+areas[_area][1], " ", "_",)
+					CH.Chart.Type = 'bar'
+					//CH.Chart.Labels = purp_names
+					CH.Chart.Labels = purp_names2a
+					CH.Chart.Data = {chP, chA}
+					CH.Chart.Names = {"Productions", "Attractions"}
+					
+					Tables = Tables + {CopyArray(CH)}
+				end
             
                 CloseView(join_vw)
                 CloseView(pa_vw)
@@ -1949,7 +1954,8 @@ Macro "RPT Trip Generation" (Perf)
     
 	//Write tables to file
     Perf.WriteTables(Tables,)	
-    
+
+/*    
     // ***************** Trip Generation by K-District *****************
     // (balanced only)
     bal = 1
@@ -2017,7 +2023,7 @@ Macro "RPT Trip Generation" (Perf)
     
     //Write tables to file
     Perf.WriteTables(Tables,)
-    
+*/    
     Return(True)
 EndMacro
 //
