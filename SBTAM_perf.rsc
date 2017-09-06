@@ -267,7 +267,7 @@ Class "Performance" (Args) //StartClass
         //Define summary areas
         self.SumArea = null
         
-        self.SumArea.[Entire Model].Query = "Select * where AB_AreaType >= 0"	//SCAG
+        self.SumArea.[Entire Model].Query = "Select * where ID >= 0"	//SCAG
         self.SumArea.[Entire Model].Network = True
         self.SumArea.[Entire Model].Zones = True
         self.SumArea.[Entire Model].Active = False
@@ -1788,18 +1788,37 @@ Macro "RPT Trip Generation" (Perf)
 	shared UT
 
     //define files
-    pa_files = {Perf.Args.Output.TGN.PAbal.Value, Perf.Args.Output.TGN.Unbal.Value} //bal, unbal
-    pa_id = {"TAZ", "TAZ"} //bal/unbal
+    //pa_files = {Perf.Args.Output.TGN.PAbal.Value, Perf.Args.Output.TGN.Unbal.Value} //bal, unbal
+	pa_files = {Perf.Args.[Peak Balanced PA], Perf.Args.[OffPeak Balanced PA]} 		//peak balanced PA, off-peak balanced PA
+    pa_id = {"ID", "ID"} //PK and OP
     pa_fld = {"P", "A"}
-    mdb_file = Perf.Args.Input.Database.Value
-    socio_file = Perf.Args.Output.TGN.Socio.Value
-    frate_tname = Perf.Args.DbTable.TGN.Frate.Value
+    mdb_file = Perf.Args.Input.Database.Value			// Access database containing model input parameters and data
+    //socio_file = Perf.Args.Output.TGN.Socio.Value		// Bivariate socioeconomic data
+	socio_file = Perf.Args.Info.ModelDir + "SED\\model_sed_subregion.bin"
+    frate_tname = Perf.Args.DbTable.TGN.Frate.Value		// Trip rate factors by K-district
     
     //define params
-    purp_names = Perf.Args.Table.TGN.Purp.Value
-    income_seg = Perf.Args.Table.TGN.ISeg.Value
-    inc_grps = Perf.Args.Table.TGN.Igrp.Value
-    inc_names = {"LI", "MI", "HI"}
+    //purp_names = Perf.Args.Table.TGN.Purp.Value
+    //income_seg = Perf.Args.Table.TGN.ISeg.Value
+    //inc_grps = Perf.Args.Table.TGN.Igrp.Value
+    //inc_names = {"LI", "MI", "HI"}
+	purp_names = { "HBWD", "HBWS", "HBSC", "HBCU", "HBSH", "HBSR",
+				   "HBO",  "WBO",  "OBO",  "HBSP"}
+	income_seg = { 1, 1, 0, 0, 1, 1, 1, 0, 0, 1}	// Income Segmentation Settings (1=yes, 0=no)
+	inc_grps   = {"1", "2", "3", "4", "5"}			// Income definitions
+	inc_names  = {"Inc1", "Inc2", "Inc3", "Inc4", "Inc5"}
+	
+	//purp_inc_names = { "HBWD1", "HBWD2", "HBWD3", "HBWD4", "HBWD5",
+	//				   "HBWS1", "HBWS2", "HBWS3", "HBWS4", "HBWS5", 
+	//				   "HBSC",
+	//				   "HBCU",
+	//				   "HBSH1", "HBSH2", "HBSH3", "HBSH4", "HBSH5",
+	//				   "HBSR1", "HBSR2", "HBSR3", "HBSR4", "HBSR5", 
+	//				   "HBO1", "HBO2", "HBO3", "HBO4", "HBO5", 
+	//				   "WBO",
+	//				   "OBO", 
+	//				   "HBSP1", "HBSP2", "HBSP3", "HBSP4", "HBSP5"}
+
 
     areas = Perf.ActiveAreas("Zones")
     
@@ -1807,29 +1826,34 @@ Macro "RPT Trip Generation" (Perf)
 	purp_names2 = null
 	purp_names2a = null
 	for _purp = 1 to purp_names.length do
-        //HBU will not be income segmented
-        if purp_names[_purp] = "HBU" then do
-            for _uname =  1 to u_names.length do
-                purp_names2 = purp_names2 + {purp_names[_purp] + u_names[_uname]}
-                purp_names2a = purp_names2a + {purp_names[_purp] + u_names[_uname]}
-            end
-        end
-		else if !income_seg[_purp] and purp_names[_purp] <> "HBU" then do
+        ////HBU will not be income segmented
+        //if purp_names[_purp] = "HBU" then do
+        //    for _uname =  1 to u_names.length do
+        //        purp_names2 = purp_names2 + {purp_names[_purp] + u_names[_uname]}
+        //        purp_names2a = purp_names2a + {purp_names[_purp] + u_names[_uname]}
+        //    end
+        //end
+		//else if !income_seg[_purp] and purp_names[_purp] <> "HBU" then do
+		if !income_seg[_purp] then do
 			purp_names2 = purp_names2 + {purp_names[_purp]} 
 			purp_names2a = purp_names2a + {purp_names[_purp]}   //nice name for income seg
 		end
 		else do
 			for _inc = 1 to inc_grps.length do
-				purp_names2 = purp_names2 + {inc_grps[_inc]+ purp_names[_purp]}
-				purp_names2a = purp_names2a + {inc_names[_inc]+ purp_names[_purp]}  //nice name (I1 --> LI)
+				purp_names2 = purp_names2 + {purp_names[_purp] + inc_grps[_inc]}
+				purp_names2a = purp_names2a + {purp_names[_purp] + inc_names[_inc]}  //nice name (1 --> Inc1)
 			end
 		end
 	end	
 
     //Open tables and files
     socio_vw = OpenTable("SEData", "FFB", {socio_file})
+    SetView(socio_vw)
+	// Create formula field "County" based on "CNTY", used to define area
+	CreateExpression(socio_vw, "County", "if CNTY = 'Imperial' then 1 else (if CNTY = 'Los Angeles' then 2 else (if CNTY = 'Orange' then 3 else (if CNTY = 'Riverside' then 4 else (if CNTY = 'San Bernardino' then 5 else (if CNTY = 'Ventura' then 6 else 99)))))", ) 	// SCAG
     
     //Summarize by area, bal/unbal
+	//SCAG: Summarize by area, bal for PK and OP
     for _area = 1 to areas.length do
         for bal = 1 to 2 do
         
@@ -1837,7 +1861,7 @@ Macro "RPT Trip Generation" (Perf)
             dim Data[purp_names2.length, 6] //cols: (1)prod, (2)attr, (3)p/HH, (4)p/POP, (5)% P, (6)% A
             //Load bal/unbal data
             pa_vw = OpenTable("PA", "FFB", {pa_files[bal],})
-            join_vw = JoinViews("Join", pa_vw+"."+pa_id[bal], socio_vw+".TAZ", )
+            join_vw = JoinViews("Join", pa_vw+"."+pa_id[bal], socio_vw+".SubregionTAZ", )
             SetView(join_vw)
             
             //and apply selection set
@@ -1848,7 +1872,7 @@ Macro "RPT Trip Generation" (Perf)
                 a_tot = 0
                 
                 //SED Basics
-                {hh, pop} = GetDataVectors(join_vw+"|Local", {"TOT_HH", "HH_POP"}, )
+                {hh, pop} = GetDataVectors(join_vw+"|Local", {"HH", "POP"}, )		//SCAG SED fields
                 
                 hh = VectorStatistic(hh, "Sum", )
                 pop = VectorStatistic(pop, "Sum", )
@@ -1918,10 +1942,13 @@ Macro "RPT Trip Generation" (Perf)
                 CloseView(pa_vw)
             end
         
-        end //bal/unbal
+        end //pk / op
     end //area
     
     CloseView(socio_vw)
+    
+	//Write tables to file
+    Perf.WriteTables(Tables,)	
     
     // ***************** Trip Generation by K-District *****************
     // (balanced only)
