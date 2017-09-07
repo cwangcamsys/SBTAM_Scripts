@@ -2032,13 +2032,27 @@ EndMacro
 // &&& Trip Distribution
 Macro "RPT Trip Distribution" (Perf)
     
-	skm_file = {Perf.Args.Output.DST.PKskm.Value, Perf.Args.Output.DST.OPskm.Value}
-	pa_file  = {Perf.Args.Output.DST.PKdist.Value, Perf.Args.Output.DST.OPdist.Value}
+	//skm_file = {Perf.Args.Output.DST.PKskm.Value, Perf.Args.Output.DST.OPskm.Value}
+	skm_file = {Perf.Args.[Highway PK DA Skim], Perf.Args.[Highway OP DA Skim]}				//SCAG, used drive alone skim
+	//pa_file  = {Perf.Args.Output.DST.PKdist.Value, Perf.Args.Output.DST.OPdist.Value}
+	//PA person trip files
+	pa_file = {{Perf.Args.[HBW PK Person Trips], 										//HBWD, HBWS by 5 income group
+				Perf.Args.[HBNW PK Person Trips],										//HBSH, HBSR, HBSP and HBO by 5 income group
+				Perf.Args.Info.ModelDir + "Tripdist\\Outputs\\HBSCPK_Trips.mtx",	//HBSC, HBSU 
+				Perf.Args.[NHB PK Person Trips]},										//WBO, OBO
+				
+				{Perf.Args.[HBW OP Person Trips], 
+				Perf.Args.[HBNW OP Person Trips],
+				Perf.Args.Info.ModelDir + "Tripdist\\Outputs\\HBSCOP_Trips.mtx",
+				Perf.Args.[NHB OP Person Trips]} }
+				
     
 	periods = {"Peak", "Off-Peak"}
-	skm_cores = {"[AB_PKTIME / BA_PKTIME] (Skim)", "[AB_OPTIME / BA_OPTIME] (Skim)"}
-	skmtt_cores = {"[AB_PKTIME / BA_PKTIME] (Skim with TT)", "[AB_OPTIME / BA_OPTIME] (Skim with TT)"}
-    
+	//skm_cores = {"[AB_PKTIME / BA_PKTIME] (Skim)", "[AB_OPTIME / BA_OPTIME] (Skim)"}
+	skm_cores = {"NON-TOLL TIME", "NON-TOLL TIME"}										//SCAG, used non-toll time
+	skmtt_cores = {"NON-TOLL TIME", "NON-TOLL TIME"}									//(with terminal time). SCAG might have only one time of travel time. Travel time with and without terminal time is set to be the same for now.
+    skm_dist_cores = {"NON-TOLL DISTANCE", "NON-TOLL DISTANCE"}
+	
     //Format strings for data columns
     fmts = {,,,"*0.0%", "*0.0", "*0.0", "*0.0", "*0.0", "*0.0"}
     Tables = null
@@ -2046,105 +2060,183 @@ Macro "RPT Trip Distribution" (Perf)
     Dim Data[2] //for PK and OP, used to sum into daily at the end
     
     //use matrix cores to get purpose names
-    trp_mat = OpenMatrix(pa_file[1], )
-    purps = GetMatrixCoreNames(trp_mat)
-    trp_mat = null
-    
-    //to accumulate daily intermediate values
-    dim len_sumDY[purps.length]
-    dim time_sumDY[purps.length]
-    dim time_tt_sumDY[purps.length]
+	purps = null
+	//new_cores = null
+	dim pa_file_cores[pa_file[1].length]
+    for _pa_file = 1 to pa_file[1].length do 
+		trp_mat = OpenMatrix(pa_file[1][_pa_file], )
+		//new_cores = GetMatrixCoreNames(trp_mat)
+		//purps = purps + new_cores
+		purps = purps + GetMatrixCoreNames(trp_mat)
+		//pa_file_cores[_pa_file] = new_cores.length
+		trp_mat = null
+		//new_cores = null
+	end
+	
+	for _purp = 1 to purps.length do 	//remove the 'PK' at the end of a trip purpose, for example, HBWD1PK becomes HBWD1
+		if Right(purps[_purp],2) = "PK" then purps[_purp] = Substring(purps[_purp],1,StringLength(purps[_purp])-2)
+	end
+	
+	//dim purps[2]
+	////purps = null
+	//new_cores = null
+	//dim pa_file_cores[2, pa_file[1].length]
+	//for _per = 1 to periods.length do
+	//	for _pa_file = 1 to pa_file[_per].length do 
+	//		trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
+	//		new_cores = GetMatrixCoreNames(trp_mat)
+	//		purps[_per] = purps[_per] + new_cores
+	//		pa_file_cores[_per][_pa_file] = new_cores.length
+	//		trp_mat = null
+	//		new_cores = null
+	//	end	
+	//end	
+	
+	//purps = { "HBWD1", "HBWD2", "HBWD3", "HBWD4", "HBWD5",
+	//	      "HBWS1", "HBWS2", "HBWS3", "HBWS4", "HBWS5", 
+	//	      "HBSH1", "HBSH2", "HBSH3", "HBSH4", "HBSH5",
+	//	      "HBSR1", "HBSR2", "HBSR3", "HBSR4", "HBSR5", 
+	//	      "HBSP1", "HBSP2", "HBSP3", "HBSP4", "HBSP5",
+	//	      "HBO1", "HBO2", "HBO3", "HBO4", "HBO5",
+	//	      "HBSC",
+	//	      "HBCU",
+ 	//	      "WBO",
+	//	      "OBO"}
+	
+	//to accumulate daily intermediate values
+	dim len_sumDY[purps.length]
+	dim time_sumDY[purps.length]
+	dim time_tt_sumDY[purps.length]	
     
     for _per = 1 to periods.length do
-    
-        Formats = null
-    
-        trp_mat = OpenMatrix(pa_file[_per], )
+		
+		Formats = null
+
         skm_mat = OpenMatrix(skm_file[_per], )
         skm_cur = CreateMatrixCurrency(skm_mat, skm_cores[_per], , , )
         skmtt_cur = CreateMatrixCurrency(skm_mat, skmtt_cores[_per], , , )
-        skmlen_cur = CreateMatrixCurrency(skm_mat, "Length (Skim)", , , )
-        
-        t = SplitPath(pa_file[_per])
-        Opts = null
-        Opts.[File Name] = t[1]+t[2]+"__TEMP__SkimRpt.mtx"
-        Opts.Label = "Scratch"
-        Opts.Tables = {"DATA"}
-        Opts.[Memory Only] = "True"
-        tmp_mat = CopyMatrixStructure({skm_cur}, Opts)
-        tmp_cur = CreateMatrixCurrency(tmp_mat, "DATA", , , )
-        
-        dim last_line[9]
-        len_sum = 0
-        time_sum = 0
-        time_tt_sum = 0
-        for _purp = 1 to purps.length do
-            purp = purps[_purp]
-            dim line[9]
-            //(1)trips (2)intra (3)inter (4)%inter (5)miles (6)min (7)mph (8) min(term) (9)mph(term)
-            trp_cur = CreateMatrixCurrency(trp_mat, purp, , , )
-        
-            //Total and intrazonal trips
-            line[1] = VectorStatistic(GetMatrixVector(trp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-            line[2] = VectorStatistic(GetMatrixVector(trp_cur, {{"Diagonal", "Column"}}), "Sum", )
-            line[3] = line[1] - line[2]
-            line[4] = line[2] / line[1]
-            
-            //Time and speed
-        
-            //Avg Length (Miles)
-            tmp_cur := skmlen_cur * trp_cur
-            V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-            line[5] = V / line[1]
-            len_sum = len_sum + V
-            len_sumDY[_purp] = nz(len_sumDY[_purp]) + V
-            
-            //Avg time (no termainl time)
-            tmp_cur := skm_cur * trp_cur
-            V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-            line[6] = V / line[1]
-            time_sum = time_sum + V
-            time_sumDY[_purp] = nz(time_sumDY[_purp]) + V
-            
-            //Avg Speed (no term)
-            line[7] = line[5] / line[6] * 60
-            
-            //Avg time (with termainl time)
-            tmp_cur := skmtt_cur * trp_cur
-            V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-            line[8] = V / line[1]
-            time_tt_sum = time_tt_sum + V
-            time_tt_sumDY[_purp] = nz(time_tt_sumDY[_purp]) + V
-            
-            //Avg Speed (no term)
-            line[9] = line[5] / line[8] * 60
-            
-            
-            //Add line to table, address formatting
-            Data[_per] = Data[_per] + {CopyArray(line)}
-            Formats = Formats + {fmts}
-            
-            //Sum totals
-            last_line[1] = nz(last_line[1]) + line[1]
-            last_line[2] = nz(last_line[2]) + line[2]
-            last_line[3] = nz(last_line[3]) + line[3]
-            last_line[4] = nz(last_line[2]) / last_line[1]
-            
-            //Close innermost loop matrix currency
-            trp_cur = null
-            
-        end
-        
-        //Calculate total time and speed
-        last_line[5] = len_sum / last_line[1]
-        last_line[6] = time_sum / last_line[1]
-        last_line[7] = last_line[5] / last_line[6] * 60
-        last_line[8] = time_tt_sum / last_line[1]
-        last_line[9] = last_line[5] / last_line[8] * 60
-        
-        Data[_per] = Data[_per] + {CopyArray(last_line)}
-        Formats = Formats + {fmts}
-        
+        skmlen_cur = CreateMatrixCurrency(skm_mat, skm_dist_cores[_per], , , )
+		
+		////use matrix cores to get purpose names
+		//purps = null
+		//new_cores = null
+		//dim pa_file_cores[pa_file[1].length]
+		//for _pa_file2 = 1 to pa_file[1].length do 
+		//	trp_mat = OpenMatrix(pa_file[1][_pa_file], )
+		//	new_cores = GetMatrixCoreNames(trp_mat)
+		//	purps = purps + new_cores						//Chao: reduced the dimentions for purps and pa_file_cores
+		//	pa_file_cores[_pa_file2] = new_cores.length
+		//	trp_mat = null
+		//	new_cores = null
+		//end
+		//
+		//if _per = 1 then do //initialize
+		//	//to accumulate daily intermediate values
+		//	dim len_sumDY[purps.length]
+		//	dim time_sumDY[purps.length]
+		//	dim time_tt_sumDY[purps.length]		
+		//end
+
+		n_purp = 0			// used to track the position in purps
+		
+		dim last_line[9]	// to accumulate for each time period
+		len_sum = 0
+		time_sum = 0
+		time_tt_sum = 0		
+		
+        for _pa_file = 1 to pa_file[1].length do			//for each pa matrix file
+			
+			trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
+	
+			t = SplitPath(pa_file[_per][_pa_file])
+			Opts = null
+			Opts.[File Name] = t[1]+t[2]+"__TEMP__SkimRpt.mtx"
+			Opts.Label = "Scratch"
+			Opts.Tables = {"DATA"}
+			Opts.[Memory Only] = "True"
+			tmp_mat = CopyMatrixStructure({skm_cur}, Opts)
+			tmp_cur = CreateMatrixCurrency(tmp_mat, "DATA", , , )
+			
+			purps2 = GetMatrixCoreNames(trp_mat)
+			
+			//for _purp = 1 to pa_file_cores[_pa_file] do 	//for each core in the matrix
+			for _purp = 1 to purps2.length do 	//for each core in the matrix
+				
+				n_purp = n_purp + 1
+				purp = purps2[_purp]
+				dim line[9]
+				//(1)trips (2)intra (3)inter (4)%inter (5)miles (6)min (7)mph (8) min(term) (9)mph(term)
+				trp_cur = CreateMatrixCurrency(trp_mat, purp, , , )
+			
+				//Total and intrazonal trips
+				line[1] = VectorStatistic(GetMatrixVector(trp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+				line[2] = VectorStatistic(GetMatrixVector(trp_cur, {{"Diagonal", "Column"}}), "Sum", )
+				line[3] = line[1] - line[2]
+				line[4] = line[2] / line[1]
+				
+				//Time and speed
+			
+				//Avg Length (Miles)
+				tmp_cur := skmlen_cur * trp_cur
+				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+				line[5] = V / line[1]
+				len_sum = len_sum + V
+				//len_sumDY[_purp] = nz(len_sumDY[_purp]) + V
+				len_sumDY[n_purp] = nz(len_sumDY[n_purp]) + V
+				
+				//Avg time (no termainl time)
+				tmp_cur := skm_cur * trp_cur
+				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+				line[6] = V / line[1]
+				time_sum = time_sum + V
+				//time_sumDY[_purp] = nz(time_sumDY[_purp]) + V
+				time_sumDY[n_purp] = nz(time_sumDY[n_purp]) + V
+				
+				//Avg Speed (no term)
+				line[7] = line[5] / line[6] * 60
+				
+				//Avg time (with termainl time)
+				tmp_cur := skmtt_cur * trp_cur
+				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+				line[8] = V / line[1]
+				time_tt_sum = time_tt_sum + V
+				//time_tt_sumDY[_purp] = nz(time_tt_sumDY[_purp]) + V
+				time_tt_sumDY[n_purp] = nz(time_tt_sumDY[n_purp]) + V
+				
+				//Avg Speed (no term)
+				line[9] = line[5] / line[8] * 60
+				
+				
+				//Add line to table, address formatting
+				Data[_per] = Data[_per] + {CopyArray(line)}
+				Formats = Formats + {fmts}
+				
+				//Sum totals
+				last_line[1] = nz(last_line[1]) + line[1]
+				last_line[2] = nz(last_line[2]) + line[2]
+				last_line[3] = nz(last_line[3]) + line[3]
+				last_line[4] = nz(last_line[2]) / last_line[1]
+				
+				//Close innermost loop matrix currency
+				trp_cur = null
+			end	//end of _purp
+			
+			trp_mat = null
+			tmp_mat = null
+			tmp_cur = null
+			
+		end	//end of _pa_file	
+			
+		//Calculate total time and speed
+		last_line[5] = len_sum / last_line[1]
+		last_line[6] = time_sum / last_line[1]
+		last_line[7] = last_line[5] / last_line[6] * 60
+		last_line[8] = time_tt_sum / last_line[1]
+		last_line[9] = last_line[5] / last_line[8] * 60
+		
+		Data[_per] = Data[_per] + {CopyArray(last_line)}
+		Formats = Formats + {fmts}
+		
         TB = null
         TB.Section1 = periods[_per]
         TB.Name = "Trip Distribution Summary"
@@ -2157,16 +2249,15 @@ Macro "RPT Trip Distribution" (Perf)
         
         Tables = Tables + {CopyArray(TB)}
         
-        trp_mat = null
+ 
         skm_mat = null
         skm_cur = null
         skmtt_cur = null
         skmlen_cur = null
-        tmp_mat = null
-        tmp_cur = null
+
     
     end //_per
-    
+	
     //Add daily table by summing PK and OP
     len_sumDY = len_sumDY + {Sum(len_sumDY)}
     time_sumDY = time_sumDY + {Sum(time_sumDY)}
