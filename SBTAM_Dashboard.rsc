@@ -110,11 +110,13 @@ DBox "SCAG Dashboard"
         */
         
         //Model-specific files and parameters
-        cnt_fld = "FIN_CNT"
+        cnt_fld = "DAY_CNT"
 		ft_fld = "AB_Facility_Type"
-		conn_qry = "Select * Where "+ft_fld+" = 100"		// SCAG Tier 1 Centroid Connectors
-        local_qry = "Select * Where "+ft_fld+" = 70"			// Minor Collector
-		hide_qry = "Select * Where "+ft_fld+" = 200 or "+ft_fld+" = 400 or "+ft_fld+" = 999"	// SCAG Tier 2 Centroid Connectors or transit links 
+		ft_fld2 = "AB_FT_Group"
+		conn_qry = "Select * Where "+ft_fld2+" = 10"		// SCAG Tier 1 Centroid Connectors
+        local_qry = "Select * Where "+ft_fld2+" = 7"			// Minor Collector
+		//hide_qry = "Select * Where "+ft_fld+" = 200 or "+ft_fld+" = 400 or "+ft_fld+" = 999"	// SCAG Tier 2 Centroid Connectors or transit links 
+		hide_qry = "Select * Where "+ft_fld2+" = 99"	// SCAG Tier 2 Centroid Connectors or transit links 
         exp_priority = "(if nz("+cnt_fld+") > 1 then (9000 - 100*"+ft_fld+") + Length else " +
                        "(1000 - 100*"+ft_fld+") + Length)"
         exp_validation = 'if TOT_Flow > 0 then ((Format(TOT_Flow/1000, "*.") + ' + 
@@ -248,7 +250,8 @@ DBox "SCAG Dashboard"
         //dbd_file = Args.Output.INI.RdNetwork.Value
 		//NetYear = Args.Param.INI.NetYear.Value
         
-        taz_file = Args.TAZ_DB
+        //taz_file = Args.TAZ_DB
+		taz_file = Args.Info.ModelDir + "\\Geography\\merged_taz_layer_Tier2.dbd"
 		indbd_file = Args.[Highway Master DB]		//input highway network
         dbd_file = Args.[Highway DB]				//output highway network
 		//NetYear = Args.Param.INI.NetYear.Value	//not available for SCAG
@@ -473,7 +476,7 @@ DBox "SCAG Dashboard"
         MP.MapName = MapName
         if TrafficMap.Opts.[Input Network] then do
 			MP.Create(indbd_file, True) //True= don't redraw map
-			MP.Settings.Network.FTField = ft_fld+"_" + NetYear
+			MP.Settings.Network.FTField = ft_fld2+"_" + NetYear
 		end
 		else MP.Create(dbd_file, True) //True= don't redraw map
         
@@ -630,7 +633,7 @@ DBox "SCAG Dashboard"
         Opts.[Close macro] = "CloseSelect"
         if TrafficMap.Opts.[Input Network] then do
 			MP.Create(indbd_file, True) //True= don't redraw map
-			MP.Settings.Network.FTField = ft_fld+"_" + NetYear
+			MP.Settings.Network.FTField = ft_fld2+"_" + NetYear
 		end
 		else MP.Create(dbd_file, True, Opts) //True= don't redraw map
         
@@ -931,25 +934,41 @@ Class "Mapper"                                                              //**
         
         //Default Network Styles
 		//Start of SCAG revisions
-        self.Settings.Network.FTField = "AB_Facility_Type"
-        self.Settings.Network.CCValue = 100
+        //self.Settings.Network.FTField = "AB_FT_Group"
+        //self.Settings.Network.CCValue = 100
+        //self.Settings.Network.FT.Proposed = {null, 0.5, "Red", "Dash"}
+        //self.Settings.Network.FT.Freeway = {1, 2.5, "Black", "Solid"}
+        //self.Settings.Network.FT.[Principal Arterial] = {40, 2, "Red", "Solid"}
+        //self.Settings.Network.FT.[Minor Arterial] = {50, 1.5, "Green", "Solid"}
+        //self.Settings.Network.FT.[Major Collector] = {60, 1, "Blue", "Solid"}
+        //self.Settings.Network.FT.[Ramp] = {80, 0, "Black", "Solid"}   
+        //self.Settings.Network.FT.[Urban Local] = {70, 0, "LtGray", "Solid"}        
+        //
+        //self.Settings.Network.FT.[Highway (Outside SOI)] = {11, 2, "LtPink", "Solid"}
+        //self.Settings.Network.FT.[Arterial (Outside SOI)] = {12, 2, "LtPurple", "Solid"}
+        //self.Settings.Network.FT.[Rural Arterial (Outside SOI)] = {13, 2, "LtBrown", "Solid"}
+        //self.Settings.Network.FT.[Local Street] = {60, 0, "LtGray", "Solid"}
+        //
+        //self.Settings.Network.FT.[Centroid Connector] = {100, 0, "Gray", "Dash"}
+        //
+		//self.Settings.Network.FT.[Walk Connector] = {49, 0, "Blue", "Dash"}
+        //self.Settings.Network.FT.[Transit Only] = {999, 0, "LtBlue", "Dash"}
+		
+		
+        self.Settings.Network.FTField = "AB_FT_Group"
+        self.Settings.Network.CCValue = 10
         self.Settings.Network.FT.Proposed = {null, 0.5, "Red", "Dash"}
-        self.Settings.Network.FT.Freeway = {10, 2.5, "Black", "Solid"}
-        self.Settings.Network.FT.[Principal Arterial] = {40, 2, "Red", "Solid"}
-        self.Settings.Network.FT.[Minor Arterial] = {50, 1.5, "Green", "Solid"}
-        self.Settings.Network.FT.[Major Collector] = {60, 1, "Blue", "Solid"}
-        self.Settings.Network.FT.[Ramp] = {80, 0, "Black", "Solid"}   
-        self.Settings.Network.FT.[Urban Local] = {70, 0, "LtGray", "Solid"}        
-        
-        self.Settings.Network.FT.[Highway (Outside SOI)] = {11, 2, "LtPink", "Solid"}
-        self.Settings.Network.FT.[Arterial (Outside SOI)] = {12, 2, "LtPurple", "Solid"}
-        self.Settings.Network.FT.[Rural Arterial (Outside SOI)] = {13, 2, "LtBrown", "Solid"}
-        self.Settings.Network.FT.[Local Street] = {60, 0, "LtGray", "Solid"}
+        self.Settings.Network.FT.Freeway = {1, 2.5, "Black", "Solid"}
+		self.Settings.Network.FT.HOV = {2, 2, "LtBrown", "Solid"}
+		self.Settings.Network.FT.Expressway = {3, 2, "LtPurple", "Solid"}
+        self.Settings.Network.FT.[Principal Arterial] = {4, 2, "Red", "Solid"}
+        self.Settings.Network.FT.[Minor Arterial] = {5, 1.5, "Green", "Solid"}
+        self.Settings.Network.FT.[Major Collector] = {6, 1, "Blue", "Solid"}
+		self.Settings.Network.FT.[Minor Collector] = {7, 0, "LtBlue", "Solid"}
+        self.Settings.Network.FT.[Ramp] = {8, 0, "Black", "Solid"}   
+		self.Settings.Network.FT.[Truck Only] = {9, 0, "LtGray", "Solid"} 
+		self.Settings.Network.FT.[Centroid Connector] = {10, 0, "Gray", "Dash"}
 
-        self.Settings.Network.FT.[Centroid Connector] = {100, 0, "Gray", "Dash"}
-        
-		self.Settings.Network.FT.[Walk Connector] = {49, 0, "Blue", "Dash"}
-        self.Settings.Network.FT.[Transit Only] = {999, 0, "LtBlue", "Dash"}
 		//End of SCAG revisions
 
 

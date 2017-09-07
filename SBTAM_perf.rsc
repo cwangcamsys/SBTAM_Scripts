@@ -3135,7 +3135,7 @@ Macro "Vehicle Validation" (Perf, per)
     dbd_file = Perf.Args.[Highway DB]
     if per = "DY" then do
         flow_file = Perf.Args.[Hwy Day Final Flow Table] //daily flows only
-        c_fld = "FIN_CNT"       //count field
+        c_fld = "DAY_CNT"       //count field
     end else if per = "AM" then do
         flow_file = Perf.Args.[Hwy AM Final Flow Table] //daily flows only
         c_fld = "AM_CNT"       //count field
