@@ -2302,17 +2302,56 @@ EndMacro
 Macro "RPT Trip Length Frequencies" (Perf)
     
 	//Params
-    max_plot_time = 30 //Maximum time to include in plots
-    purp_names = Perf.Args.Table.TGN.Purp.Value
-	income_seg = Perf.Args.Table.TGN.ISeg.Value
-	inc_grps   = Perf.Args.Table.TGN.Igrp.Value
+    max_plot_time = 40 //Maximum time to include in plots
+    //purp_names = Perf.Args.Table.TGN.Purp.Value
+	//income_seg = Perf.Args.Table.TGN.ISeg.Value
+	//inc_grps   = Perf.Args.Table.TGN.Igrp.Value
+	
     Verbose = True //!!! Must use verbose until TLFD is updated to use memory matrix, or summing is done in Trip Dist instead
 
-	skm_files = {Perf.Args.Output.DST.PKskm.Value, Perf.Args.Output.DST.OPskm.Value}
+	//skm_files = {Perf.Args.Output.DST.PKskm.Value, Perf.Args.Output.DST.OPskm.Value}
+	skm_files = {Perf.Args.[Highway PK DA Skim], Perf.Args.[Highway OP DA Skim]}				//SCAG, used drive alone skim
     t = SplitPath(skm_files[1])
     pth = t[1]+t[2]
-	pa_files  = {Perf.Args.Output.DST.PKdist.Value, Perf.Args.Output.DST.OPdist.Value}
+	//pa_files  = {Perf.Args.Output.DST.PKdist.Value, Perf.Args.Output.DST.OPdist.Value}
+	pa_files = {{Perf.Args.[HBW PK Person Trips], 										//HBWD, HBWS by 5 income group
+				Perf.Args.[HBNW PK Person Trips],										//HBSH, HBSR, HBSP and HBO by 5 income group
+				Perf.Args.Info.ModelDir + "Tripdist\\Outputs\\HBSCPK_Trips.mtx",	//HBSC, HBSU 
+				Perf.Args.[NHB PK Person Trips]},										//WBO, OBO
+				
+				{Perf.Args.[HBW OP Person Trips], 
+				Perf.Args.[HBNW OP Person Trips],
+				Perf.Args.Info.ModelDir + "Tripdist\\Outputs\\HBSCOP_Trips.mtx",
+				Perf.Args.[NHB OP Person Trips]} }
+	
     tlfd_files = {pth+"PK_TLFD.bin", pth+"OP_TLFD.bin"}
+	
+	
+    ////use matrix cores to get purpose names
+	//purps = null
+	////new_cores = null
+	//dim pa_file_cores[pa_file[1].length]
+    //for _pa_file = 1 to pa_file[1].length do 
+	//	trp_mat = OpenMatrix(pa_file[1][_pa_file], )
+	//	//new_cores = GetMatrixCoreNames(trp_mat)
+	//	//purps = purps + new_cores
+	//	purps = purps + GetMatrixCoreNames(trp_mat)
+	//	//pa_file_cores[_pa_file] = new_cores.length
+	//	trp_mat = null
+	//	//new_cores = null
+	//end
+	//
+	//for _purp = 1 to purps.length do 	//remove the 'PK' at the end of a trip purpose, for example, HBWD1PK becomes HBWD1
+	//	if Right(purps[_purp],2) = "PK" then purps[_purp] = Substring(purps[_purp],1,StringLength(purps[_purp])-2)
+	//end
+
+	
+	
+	purp_names = { "HBWD", "HBWS", "HBSH", "HBSR", "HBSP", "HBO",  
+				   "HBSC", "HBCU", "WBO",  "OBO" }
+	
+	num_array = {"0","1","2","3","4","5","6","7","8","9"}	//used to determine if a letter is a number
+	
     
     //Matrix indices - row/col index (null to use default/only index)
     skm_idx = {,}
@@ -2320,8 +2359,11 @@ Macro "RPT Trip Length Frequencies" (Perf)
     
 	periods = {"PK", "OP", "DY"}
     per_names = {"Peak", "Off-Peak", "Daily"}
-	skmlen_cores = {"Length (Skim)", "Length (Skim)"}
-	skmtt_cores = {"[AB_PKTIME / BA_PKTIME] (Skim with TT)", "[AB_OPTIME / BA_OPTIME] (Skim with TT)"}
+	//skmlen_cores = {"Length (Skim)", "Length (Skim)"}
+	//skmtt_cores = {"[AB_PKTIME / BA_PKTIME] (Skim with TT)", "[AB_OPTIME / BA_OPTIME] (Skim with TT)"}
+	skmlen_cores = {"NON-TOLL DISTANCE", "NON-TOLL DISTANCE"}
+	skmtt_cores = {"NON-TOLL TIME", "NON-TOLL TIME"}			//Travel time with terminal time.
+
     
     //Format strings for data columns
     Tables = null
@@ -2331,73 +2373,109 @@ Macro "RPT Trip Length Frequencies" (Perf)
         per = periods[_per]
 
         if per != "DY" then do
-            trp_mat_seg = OpenMatrix(pa_files[_per], )
-            trp_cur_seg = CreateMatrixCurrencies(trp_mat_seg, trp_idx[1], trp_idx[2], )
+
             skm_mat = OpenMatrix(skm_files[_per], )
             skm_curs = CreateMatrixCurrencies(skm_mat, skm_idx[1], skm_idx[2], )
             
-            //Add up segments into a temporary matrix
-            //!!! !!! TODO: Consider creating this summary as part of the 
-            //              Trip Distribution Model instead
-            t = SplitPath(pa_files[_per])
-            Opts = null
-            scratch_file = t[1]+t[2]+"__TEMP__"+t[3]+t[4]
-            Opts.[File Name] = scratch_file
-            Opts.Label = per + " PA Trips by Purpose"
-            Opts.Tables = purp_names + {skmlen_cores[_per], skmtt_cores[_per]} //include skims and a scratch core in this mem matrix for improved speed
-            if !Verbose then Opts.[Memory Only] = "True"
-            else Opts.Compression = 1
-            trp_mat = CopyMatrixStructure({trp_cur_seg[1][2]}, Opts)
-            trp_curs = CreateMatrixCurrencies(trp_mat, , , )
+            for _pa_file = 1 to pa_files[1].length do			//for each pa matrix file
+				
+				trp_mat_seg = OpenMatrix(pa_files[_per][_pa_file], )
+				trp_cur_seg = CreateMatrixCurrencies(trp_mat_seg, trp_idx[1], trp_idx[2], )
+				
+				if _pa_file = 1 then do 						//create a tempory file, with all trip purposes (not by income group) + skim length + skim travel time
+					//Add up segments into a temporary matrix
+					//!!! !!! TODO: Consider creating this summary as part of the 
+					//              Trip Distribution Model instead
+					t = SplitPath(pa_files[_per][_pa_file])
+					Opts = null
+					scratch_file = t[1]+t[2]+"__TEMP__"+per+"_Trips"+t[4]
+					Opts.[File Name] = scratch_file
+					Opts.Label = per + " PA Trips by Purpose"
+					Opts.Tables = purp_names + {skmlen_cores[_per], skmtt_cores[_per]} //include skims and a scratch core in this mem matrix for improved speed
+					if !Verbose then Opts.[Memory Only] = "True"
+					else Opts.Compression = 1
+					trp_mat = CopyMatrixStructure({trp_cur_seg[1][2]}, Opts)
+					trp_curs = CreateMatrixCurrencies(trp_mat, , , )
+				end
+				
+				purp_cores = GetMatrixCoreNames(trp_mat_seg)
+				
+				//Accumulate trips by purpose (aggregate income groups)
+				//purp_current = null
+				for _purp = 1 to purp_cores.length do
+					purp2 = purp_cores[_purp]
+					if Right(purp2,2) = "PK" or Right(purp2,2) = "OP" then do 
+						purp = Substring(purp2,1,StringLength(purp2)-2)			//now "HBWD1PK" becomes "HBWD1"
+						last_letter = Right(purp,1)
+						if ArrayPosition(num_array,{last_letter},) > 0 then do 
+							purp = Substring(purp,1,StringLength(purp)-1)		//now "HBWD1" becomes "HBWD"
+						end
+					end
+					else purp = purp2
+					
+					trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(purp2))
+					
+					//if purp = purp_current then do 
+					//	trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(purp2))
+					//else do 
+					//	purp_current = 	purp
+					//	trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(purp2))
+					//end	
+					//
+					//
+					//purp_current = 	purp
+					//
+					//trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(purp2))	
+                    //
+                    //
+					//
+					//	if 
+					//if income_seg[_purp] then do
+					//	for inc in inc_grps do
+					//		trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(inc+purp))
+					//	end //inc
+					//end //segmented
+					//else do
+					//	trp_curs.(purp) := trp_cur_seg.(purp)
+					//end
+				end //for
+				trp_mat_seg = null
+				trp_cur_seg = null
+			end		//for each pa matrix file
+
+			//Add skim data to MEM matrix
+			trp_curs.(skmlen_cores[_per]) := skm_curs.(skmlen_cores[_per])
+			trp_curs.(skmtt_cores[_per]) := skm_curs.(skmtt_cores[_per])
+			
+			//Done with segmented matrix and skim, so close
+			skm_mat = null
+			skm_curs = null
             
-            //Accumulate trips by purpose
-            for _purp = 1 to purp_names.length do
-                purp = purp_names[_purp]
-                if income_seg[_purp] then do
-                    for inc in inc_grps do
-                        trp_curs.(purp) := nz(trp_curs.(purp)) + nz(trp_cur_seg.(inc+purp))
-                    end //inc
-                end //segmented
-                else do
-                    trp_curs.(purp) := trp_cur_seg.(purp)
-                end
-            end //for
-            
-            //Add skim data to MEM matrix
-            trp_curs.(skmlen_cores[_per]) := skm_curs.(skmlen_cores[_per])
-            trp_curs.(skmtt_cores[_per]) := skm_curs.(skmtt_cores[_per])
-            
-            //Done with segmented matrix and skim, so close
-            trp_mat_seg = null
-            trp_cur_seg = null
-            skm_mat = null
-            skm_curs = null
-            
-            //Calculate trip length frequency distributions
-            Opts = null
-            Opts.Tables = purp_names
-            ok = Perf.CalcTLFD(scratch_file, scratch_file, skmtt_cores[_per], tlfd_files[_per], Opts)
-            if !ok then Throw("Batch Error calculating TLFD.  See the log file for details.")
-            
-            //Close scratch matrix
-            trp_mat = null
-            trp_curs = null
-            
-            //Create TLFD Charts and tables
-            
-            //Load from TLFD
-            tlfd_vw = OpenTable("TLFD", "FFB", {tlfd_files[_per]})
-            Vs = GetDataVectors(tlfd_vw+"|", {"BIN"}+purp_names, )
-            BINS = Vs[1]
-            //BINS_lim = SubVector(BINS, 1, max_plot_time)
+			//Calculate trip length frequency distributions
+			Opts = null
+			Opts.Tables = purp_names
+			ok = Perf.CalcTLFD(scratch_file, scratch_file, skmtt_cores[_per], tlfd_files[_per], Opts)
+			if !ok then Throw("Batch Error calculating TLFD.  See the log file for details.")
+				
+			//Close scratch matrix
+			trp_mat = null
+			trp_curs = null	
+				
+			//Create TLFD Charts and tables
+			
+			//Load from TLFD
+			tlfd_vw = OpenTable("TLFD", "FFB", {tlfd_files[_per]})
+			Vs = GetDataVectors(tlfd_vw+"|", {"BIN"}+purp_names, )
+			BINS = Vs[1]
+			//BINS_lim = SubVector(BINS, 1, max_plot_time)
 			BINS_lim = a2v(Subarray(v2a(BINS), 1, max_plot_time))		//SCAG, SubVector is not available in TransCAD v6
-            TRIPS = Subarray(Vs, 2, )
-            
-            //Accumulate daily trips by bin
-            for ii = 1 to TRIPS.length do
-                TRIPS_DY[ii] = nz(TRIPS_DY[ii]) + TRIPS[ii]
-            end
-        
+			TRIPS = Subarray(Vs, 2, )
+			
+			//Accumulate daily trips by bin
+			for ii = 1 to TRIPS.length do
+				TRIPS_DY[ii] = nz(TRIPS_DY[ii]) + TRIPS[ii]
+			end
+
         end //if not daily
         else do
             TRIPS = CopyArray(TRIPS_DY)

@@ -934,27 +934,6 @@ Class "Mapper"                                                              //**
         
         //Default Network Styles
 		//Start of SCAG revisions
-        //self.Settings.Network.FTField = "AB_FT_Group"
-        //self.Settings.Network.CCValue = 100
-        //self.Settings.Network.FT.Proposed = {null, 0.5, "Red", "Dash"}
-        //self.Settings.Network.FT.Freeway = {1, 2.5, "Black", "Solid"}
-        //self.Settings.Network.FT.[Principal Arterial] = {40, 2, "Red", "Solid"}
-        //self.Settings.Network.FT.[Minor Arterial] = {50, 1.5, "Green", "Solid"}
-        //self.Settings.Network.FT.[Major Collector] = {60, 1, "Blue", "Solid"}
-        //self.Settings.Network.FT.[Ramp] = {80, 0, "Black", "Solid"}   
-        //self.Settings.Network.FT.[Urban Local] = {70, 0, "LtGray", "Solid"}        
-        //
-        //self.Settings.Network.FT.[Highway (Outside SOI)] = {11, 2, "LtPink", "Solid"}
-        //self.Settings.Network.FT.[Arterial (Outside SOI)] = {12, 2, "LtPurple", "Solid"}
-        //self.Settings.Network.FT.[Rural Arterial (Outside SOI)] = {13, 2, "LtBrown", "Solid"}
-        //self.Settings.Network.FT.[Local Street] = {60, 0, "LtGray", "Solid"}
-        //
-        //self.Settings.Network.FT.[Centroid Connector] = {100, 0, "Gray", "Dash"}
-        //
-		//self.Settings.Network.FT.[Walk Connector] = {49, 0, "Blue", "Dash"}
-        //self.Settings.Network.FT.[Transit Only] = {999, 0, "LtBlue", "Dash"}
-		
-		
         self.Settings.Network.FTField = "AB_FT_Group"
         self.Settings.Network.CCValue = 10
         self.Settings.Network.FT.Proposed = {null, 0.5, "Red", "Dash"}
@@ -968,7 +947,6 @@ Class "Mapper"                                                              //**
         self.Settings.Network.FT.[Ramp] = {8, 0, "Black", "Solid"}   
 		self.Settings.Network.FT.[Truck Only] = {9, 0, "LtGray", "Solid"} 
 		self.Settings.Network.FT.[Centroid Connector] = {10, 0, "Gray", "Dash"}
-
 		//End of SCAG revisions
 
 
