@@ -756,7 +756,7 @@ DBox "SCAG Dashboard"
 		end	
 		
 		quit:
-        RunMacro("TCB Closing", ret_value, !ret_value)
+        //RunMacro("TCB Closing", ret_value, !ret_value)
 		ShowDbox()
     enditem	
 	
@@ -1968,10 +1968,10 @@ Dbox "SelectCompare" title: "Comparison Map"                                //**
     text 1, 1 Variable: "Select a baseline scenario for comparison:"
     popdown Menu "Baseline" 3, 2.5, 30 List: ScenList Variable: BaseFlag
     button "OK" 15, 5.5, 10, 1.5 do
-        if base_flow = scen_flow then do
-            ShowMessage("Scenarios reference the same output flow file.  Cannot create comparison map.")
-            Return()
-        end
+        //if base_flow = scen_flow then do
+        //    ShowMessage("Scenarios reference the same output flow file.  Cannot create comparison map.")
+        //    Return()
+        //end
         Return(FlowList[BaseFlag])
     enditem
     button "Cancel" 26, 5.5, 10, 1.5 do
