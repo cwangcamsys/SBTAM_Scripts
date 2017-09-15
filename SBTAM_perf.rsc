@@ -2795,29 +2795,33 @@ EndMacro //End of Assigned Trips Summary
 //
 Macro "RPT Transit Assignment" (Perf)
     
-    //Define intermediate files
-    inrts_file = Perf.Args.Input.Routes.Value
-	tdbd_file= Perf.Args.Output.INI.TrNetwork.Value
+    periods = {"AM", "MD", "PM", "EVE", "NT"}
+	
+	//Define intermediate files
+	tdbd_file = Perf.Args.[Highway Master DB]
+	rts_file = Perf.Args.[Transit RS]
 	//Define the (output copy of) route system file
 	//**Special case - uses the name from the input file - needed for rts copy**
-	outtmp = SplitPath(tdbd_file)
-	intmp  = SplitPath(inrts_file)
-	rts_file = outtmp[1]+outtmp[2]+intmp[3]+intmp[4]
+	//outtmp = SplitPath(tdbd_file)
+	//intmp  = SplitPath(inrts_file)
+	//rts_file = outtmp[1]+outtmp[2]+intmp[3]+intmp[4]
 	
-	onoff_file = Perf.Args.Output.PST.DAYonoff.Value
+	//onoff_file = Perf.Args.Output.PST.DAYonoff.Value
+	//pa_files = {Perf.Args.Output.MOD.TrOPW.Value, 
+	//		Perf.Args.Output.MOD.TrPKW.Value,
+	//		Perf.Args.Output.MOD.TrPKD.Value} 
+	onoff_file = null
+	pa_files = null
+	for _per = 1 to periods.length do 
+		onoff_file = onoff_file + {Perf.Args.Info.ModelDir + "Assign\\Outputs\\" + periods[_per] + "_Transit_Summary_OF.bin"}
+		pa_files = pa_files + {Perf.Args.Info.ModelDir + "ODTable\\Outputs\\Transit_" + periods[_per] + "_OD.mtx"}
+	end		
+
+	dim OnTotal[periods.length]
+	dim Data[periods.length,5] //five columns, to be transposed before write
+	dim TripTotal[periods.length] 
+	TripTotal_daily = 0
 				   
-	pa_files = {Perf.Args.Output.MOD.TrOPW.Value, 
-				Perf.Args.Output.MOD.TrPKW.Value,
-				Perf.Args.Output.MOD.TrPKD.Value} 
-
-		
-NextStep = "Aggregate boarding data"
-SetStatus(1, NextStep, )
-
-    onoff_vw = OpenTable("OnOff", "FFB", {onoff_file}, )
-    agg_vw = AggregateTable("OnOff_Agg", onoff_vw+"|", "MEM", null, "ROUTE", {{"On", "SUM"}}, {{"Missing as zero"}})
-    CloseView(onoff_vw)
-    
 NextStep = "Load the Route System"
 SetStatus(1, NextStep, )
 
@@ -2829,40 +2833,86 @@ SetStatus(1, NextStep, )
     stop_lyr  = lyrs[2]
 	tnode_lyr = lyrs[4]
 	tlink_lyr = lyrs[5]
-    
+
+				
+NextStep = "Aggregate boarding data"
+SetStatus(1, NextStep, )
+
+    for _per = 1 to onoff_file.length do 
+	
+		onoff_vw = OpenTable("OnOff", "FFB", {onoff_file[_per]}, )
+		tempdir = GetTempPath()
+		//agg_vw = AggregateTable("OnOff_Agg", onoff_vw+"|", "MEM", null, "ROUTE", {{"On_Total", "SUM"}}, {{"Missing as zero"}})
+		agg_vw = AggregateTable("OnOff_Agg", onoff_vw+"|", "FFB", tempdir + "OnOff_Agg.bin", "ROUTE", {{"On_Total", "SUM"}}, {{"Missing as zero"}})
+		CloseView(onoff_vw)
+
 NextStep = "Get On-Off Data"
 SetStatus(1, NextStep, )
 
-    //Join to routes to match ID with name
-    join_vw = JoinViews("join", agg_vw+".ROUTE", route_lyr+".Route_ID", )
-    
-    //Load data into a table
-    dim Data[2] //two columns, to be transposed before write
-    Vs = GetDataVectors(join_vw+"|", {"Route_Name", "On"}, {{"Sort Order", {{"Route_Name", "Ascending"}}}})
-    OnTotal = VectorStatistic(Vs[2], "Sum", )
-    Data[1] = V2A(Vs[1])
-    Data[2] = V2A(Vs[2])
-    
-    CloseView(join_vw)
-    CloseView(agg_vw)
-    CloseMap(map)
-    
+		//Join to routes to match ID with name
+		//join_vw = JoinViews("join", agg_vw+".ROUTE", route_lyr+".Route_ID", )
+		join_vw = JoinViews("join", route_lyr+".Route_ID", agg_vw+".ROUTE",  )
+		
+		//Load data into a table
+		Vs = GetDataVectors(join_vw+"|", {"Route_Name", "On_Total", "Carrier", "Mode", "Mode_Desc"}, {{"Sort Order", {{"Route_Name", "Ascending"}}}})
+		OnTotal[_per] = VectorStatistic(Vs[2], "Sum", )
+		Data[_per][1] = V2A(Vs[1])	//Route_Name
+		Data[_per][2] = V2A(Vs[2])	//On_Total
+		Data[_per][3] = V2A(Vs[3]) 	//Carrier
+		Data[_per][4] = V2A(Vs[4]) 	//Mode
+		Data[_per][5] = V2A(Vs[5]) 	//Mode Desc
+		
+		if _per = 1 then do 
+			v_daily = nz(Vs[2])
+			OnTotal_daily = OnTotal[_per]
+		end	
+		else do
+			v_daily = v_daily + nz(Vs[2])
+			OnTotal_daily = OnTotal_daily + OnTotal[_per]
+		end	
+		
+		CloseView(join_vw)
+		CloseView(agg_vw)
+
 NextStep = "Get Linked Transit Trips"
 SetStatus(1, NextStep, )
     
-	TripTotal = 0
-	for i = 1 to pa_files.length do
-		mat = OpenMatrix(pa_files[i], )
-		cur = CreateMatrixCurrency(mat, "Total", , , )
+		TripTotal[_per] = 0	//need quicksum
+		mat = OpenMatrix(pa_files[_per], )
+		core_names = GetMatrixCoreNames(mat)
+		cur1 = CreateMatrixCurrency(mat, core_names[1], , , )
+		
+		// Generate quicksum
+		Opts = null
+		Opts.Input.[Input Currency] =  cur1
+		RunMacro("TCB Run Operation", "Matrix QuickSum", Opts)
+
+		//cur = CreateMatrixCurrency(mat, "Total", , , )
+		cur = CreateMatrixCurrency(mat, "QuickSum", , , )
 		marg = GetMatrixVector(cur, {{"Marginal", "Column Sum"}})
-		TripTotal = TripTotal + nz(VectorStatistic(marg, "Sum", ))
+		TripTotal[_per] = nz(VectorStatistic(marg, "Sum", ))
+		TripTotal_daily = TripTotal_daily + TripTotal[_per] 
 		
 		mat = null
 		cur = null
-	end
+		
+	end	// end of _per
+	
+	CloseMap(map)
     
-    RowNames = Data[1] + {"Total Boardings", "Linked Trips", "Boardings per Trip"}
-    TableData = TransposeArray({Data[2] + {OnTotal, TripTotal, OnTotal/TripTotal}})
+    //RowNames = Data[1] + {"Total Boardings", "Linked Trips", "Boardings per Trip"}
+	RowNames = Data[1][1] + {"Total Boardings", "Linked Trips", "Boardings per Trip"}
+
+	dim temp_TableData[4 + periods.length]
+	temp_TableData[1] = v2a(v_daily) + {OnTotal_daily, TripTotal_daily, OnTotal_daily/TripTotal_daily}		//daily ridership
+	temp_TableData[2] = Data[1][3] + { , , }																//carrier
+	temp_TableData[3] = Data[1][4] + { , , }																//Mode	
+	temp_TableData[4] = Data[1][5] + { , , }																//Mode Desc
+	for _per = 1 to periods.length do 
+		temp_TableData[4 + _per] = Data[_per][2] + {OnTotal[_per], TripTotal[_per], OnTotal[_per]/TripTotal[_per]}		//daily ridership
+	end	
+	
+	TableData = TransposeArray(temp_TableData)
     
 NextStep = "Write boarding tables"
 SetStatus(1, NextStep, )
@@ -2882,7 +2932,13 @@ SetStatus(1, NextStep, )
     TB.Name = "Transit Boardings Summary"
     TB.Table.TableData = TableData
     TB.Table.RowNames = RowNames
-    TB.Table.ColNames = {"Boardings"}
+    //TB.Table.ColNames = {"Boardings"}
+	TB.Table.ColNames = {"Daily Boardings", "Carrier", "Mode", "Mode Desc"}
+	for _per = 1 to periods.length do 
+		TB.Table.ColNames = TB.Table.ColNames + {periods[_per] + " Boardings"}
+		fmts[fmts.length][4 + _per] = "*.00"
+	end	
+		
     TB.Table.Formats = fmts
     TB.Table.Class = "dataframe no-last-col"
     TB.Table.CellStyles = CellStyles
@@ -2894,8 +2950,9 @@ SetStatus(1, NextStep, )
     CH.Name = "Transit Boardings by Route"
     CH.Chart.CanvasID = "transit_boardings_chart"
     CH.Chart.Type = 'bar'
-    CH.Chart.Labels = Data[1]
-    CH.Chart.Data = {Round(A2V(Data[2]), 0)}
+    CH.Chart.Labels = Data[1][1]
+    //CH.Chart.Data = {Round(A2V(Data[2]), 0)}
+	CH.Chart.Data = {Round(v_daily, 0)}
     CH.Chart.Names = {"Boardings"}
     CH.Chart.XAxis = "Route"
     CH.Chart.YAxis = "Daily Boardings"
