@@ -2991,10 +2991,17 @@ Macro "RPT Vehicle Assignment" (Perf)
 
     //Summary area - areas = {name, query}
     areas = Perf.ActiveAreas("Network")  //Can be Network or Zones
-    
+    periods = {"AM", "MD", "PM", "EVE", "NT"}
+	
     //Define files
-	dbd_file = Perf.Args.Output.INI.RdNetwork.Value
-	flow_file = Perf.Args.Output.PST.DailyFlow.Value //daily flows only
+	//dbd_file = Perf.Args.Output.INI.RdNetwork.Value
+	dbd_file = Perf.Args.[Highway DB]
+	//flow_file = Perf.Args.Output.PST.DailyFlow.Value //daily flows only
+	flow_file = {Perf.Args.[Hwy AM Final Flow Table], 
+				 Perf.Args.[Hwy MD Final Flow Table],
+				 Perf.Args.[Hwy PM Final Flow Table],
+				 Perf.Args.[Hwy EVE Final Flow Table],
+				 Perf.Args.[Hwy NT Final Flow Table]}		//The order should match "periods"
 
     
     //Define tables to hold data
@@ -3019,48 +3026,72 @@ Macro "RPT Vehicle Assignment" (Perf)
     layers = RunMacro("TCB get DB line and node layers", dbd_file)
     node_lyr = layers[1]
     link_lyr = layers[2]
+	
+	CreateExpression(link_lyr, "FT", "if CC = 1 then 10 else (if AB_Facility_Type<100 then  floor(AB_Facility_Type/10) else 99)", ) 	// SCAG: Need to add the field "CC" in the highway network
+    CreateExpression(link_lyr, "AT", "AB_AreaType", ) 	// SCAG: use AB_AreaType as AT	
     
-    //Open and join flows
-    flow_vw = OpenTable("Flow", "FFB", {flow_file,})
-    join_vw = JoinViews("Network+Flow", link_lyr+".ID", flow_vw+".ID1", )
+    ////Open and join flows
+    //flow_vw = OpenTable("Flow", "FFB", {flow_file,})
+    //join_vw = JoinViews("Network+Flow", link_lyr+".ID", flow_vw+".ID1", )
     
     //Run cross-classification for each area and for each variable
     for _area = 1 to areas.length do
         area_name = areas[_area][1]
         area_qry = areas[_area][2]
-        SetView(join_vw)
-        setcount = SelectByQuery("Sel", "Several", "Select * where FT > 0", )
-        setcount = SelectByQuery("Sel", "Subset", area_qry, )
         
-        //Only summarize if links are selected
-        if setcount > 0 then do
-            //Load data from view
-            {FTv, ATv, FLOWv, AB_FLOWv, BA_FLOWv, AB_TIMEv, BA_TIMEv, LENGTHv, FFv} = GetDataVectors(join_vw+"|Sel", 
-            {"FT", "AT", "TOT_Flow", "AB_Flow", "BA_Flow", "AB_TIME", "BA_TIME", "Length", "FF_TIME"}, )
-                               
-            //Math
-            VMTv = FLOWv * LENGTHv
-            FFVHTv = (FLOWv * FFv) / 60
-            VHTv = (nz(AB_FLOWv * AB_TIMEv) + nz(BA_FLOWv * BA_TIMEv)) / 60
-            DELAYv = Max(VHTv - FFVHTv, 0) //prevent "negative zero"
-           
-            
-            //Compute cross-class with marginals
-            tVMT[_area] = Perf.CrossTab(FTv, ATv, VMTv, True)
-            tVHT[_area] = Perf.CrossTab(FTv, ATv, VHTv, True)
-            tDelay[_area] = Perf.CrossTab(FTv, ATv, DELAYv, True)
-            
-            //Compute speeds from aggregate
-            dim t[tVMT[_area].length, tVMT[_area][1].length]
-            tSpeed[_area] = CopyArray(t)
-            for ii = 1 to tVMT[_area].length do
-                for jj = 1 to tVMT[_area][ii].length do
-                    if tVHT[_area][ii][jj] = 0 then tSpeed[_area][ii][jj] = 0
-                    else tSpeed[_area][ii][jj] = tVMT[_area][ii][jj] / tVHT[_area][ii][jj]
-                end
-            end
-            
-        end //if records were selected
+		for _per = 1 to periods.length do 
+			//Open and join flows
+			flow_vw = OpenTable("Flow", "FFB", {flow_file[_per],})
+			join_vw = JoinViews("Network+Flow", link_lyr+".ID", flow_vw+".ID1", )
+			
+			SetView(join_vw)
+			setcount = SelectByQuery("Sel", "Several", "Select * where FT > 0", )
+			setcount = SelectByQuery("Sel", "Subset", area_qry, )
+			
+			//Only summarize if links are selected
+			if setcount > 0 then do
+				//Load data from view
+				//{FTv, ATv, FLOWv, AB_FLOWv, BA_FLOWv, AB_TIMEv, BA_TIMEv, LENGTHv, FFv} = GetDataVectors(join_vw+"|Sel", 
+				//{"FT", "AT", "TOT_Flow", "AB_Flow", "BA_Flow", "AB_TIME", "BA_TIME", "Length", "FF_TIME"}, )
+				{FTv, ATv, FLOWv, AB_FLOWv, BA_FLOWv, AB_TIMEv, BA_TIMEv, LENGTHv, AB_FFTv, BA_FFTv} = GetDataVectors(join_vw+"|Sel", 
+				{"FT", "AT", "TOT_Flow", "AB_Flow", "BA_Flow", "AB_TIME", "BA_TIME", "Length", "AB_FreeTime", "BA_FreeTime"}, )			
+								
+				if _per = 1 then do 
+					//Math
+					VMTv = FLOWv * LENGTHv
+					FFVHTv = (nz(AB_FLOWv * AB_FFTv) + nz(BA_FLOWv * BA_FFTv)) / 60
+					VHTv = (nz(AB_FLOWv * AB_TIMEv) + nz(BA_FLOWv * BA_TIMEv)) / 60
+					DELAYv = Max(VHTv - FFVHTv, 0) //prevent "negative zero"
+				end 
+				else do 
+					VMTv = VMTv + FLOWv * LENGTHv
+					FFVHTv = FFVHTv + (nz(AB_FLOWv * AB_FFTv) + nz(BA_FLOWv * BA_FFTv)) / 60
+					VHTv = VHTv + (nz(AB_FLOWv * AB_TIMEv) + nz(BA_FLOWv * BA_TIMEv)) / 60
+					DELAYv = DELAYv + Max(VHTv - FFVHTv, 0) //prevent "negative zero"
+				end	
+				
+				CloseView(join_vw)
+				CloseView(flow_vw)
+			end //if records were selected				
+		end 	// end period
+			
+				
+		//Compute cross-class with marginals
+		tVMT[_area] = Perf.CrossTab(FTv, ATv, VMTv, True)
+		tVHT[_area] = Perf.CrossTab(FTv, ATv, VHTv, True)
+		tDelay[_area] = Perf.CrossTab(FTv, ATv, DELAYv, True)
+		
+		//Compute speeds from aggregate
+		dim t[tVMT[_area].length, tVMT[_area][1].length]
+		tSpeed[_area] = CopyArray(t)
+		for ii = 1 to tVMT[_area].length do
+			for jj = 1 to tVMT[_area][ii].length do
+				if tVHT[_area][ii][jj] = 0 then tSpeed[_area][ii][jj] = 0
+				else tSpeed[_area][ii][jj] = tVMT[_area][ii][jj] / tVHT[_area][ii][jj]
+			end
+		end
+				
+
     end //end loop over summary areas
     
     //Re-organize table arrays into 
