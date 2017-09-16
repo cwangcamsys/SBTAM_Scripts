@@ -2678,19 +2678,30 @@ Macro "RPT Assigned Vehicle Trips" (Perf)
     areas = Perf.ActiveAreas("Zones")
     
     //Define files
-	periods = {"AM Peak", "PM Peak", "Off Peak"}
-	od_files = {Perf.Args.Output.ASN.AMtrips.Value, Perf.Args.Output.ASN.PMtrips.Value, Perf.Args.Output.ASN.OPtrips.Value}
-	pabal_file = Perf.Args.Output.TGN.PAbal.Value //Balanced PA file to read AT / Summary area info
+	//periods = {"AM Peak", "PM Peak", "Off Peak"}
+	periods = {"AM", "MD", "PM", "EVE", "NT"}
+	//od_files = {Perf.Args.Output.ASN.AMtrips.Value, Perf.Args.Output.ASN.PMtrips.Value, Perf.Args.Output.ASN.OPtrips.Value}
+	od_files = {Perf.Args.[AM OD Trips], 
+				Perf.Args.[MD OD Trips],
+				Perf.Args.[PM OD Trips],
+				Perf.Args.[EVE OD Trips],
+				Perf.Args.[NT OD Trips]}	//the order should match "periods"
+	
+	//pabal_file = Perf.Args.Output.TGN.PAbal.Value //Balanced PA file to read AT / Summary area info
+	taz_file = Perf.Args.Info.ModelDir + "\\Geography\\merged_taz_layer_Tier2.bin"		//Balanced PA file to read AT / Summary area info
+	//pabal_file = {Perf.Args.[Peak Balanced PA], Perf.Args.[OffPeak Balanced PA]} 		//peak balanced PA, off-peak balanced PA
+	//																				//Balanced PA file to read AT / Summary area info	
 	
     //use matrix cores to get purpose names
     mat = OpenMatrix(od_files[1], )
     purps = GetMatrixCoreNames(mat)
-    purps = Subarray(purps, 1, purps.length-1) //exclude final total core
+    //purps = Subarray(purps, 1, purps.length-1) //exclude final total core
     mat = null
 	
     //Use pabal to select by summary area
-	pabal_vw = OpenTable("PABalanced", "FFB", {pabal_file,})
-    SetView(pabal_vw)
+	taz_vw = OpenTable("TAZ", "FFB", {taz_file,})
+    SetView(taz_vw)
+	CreateExpression(taz_vw, "County", "CNTY", )
     
         
     //5 rows: (1)Intra, (2)iter orig, (3)tot orig, (4)inter dest, (5)tot dest
@@ -2716,7 +2727,7 @@ Macro "RPT Assigned Vehicle Trips" (Perf)
         for _area = 1 to areas.length do 
 
         	SelectByQuery("Local", "Several", areas[_area][2],)
-        	idx = CreateMatrixIndex(areas[_area][1], mat, "Both", pabal_vw+"|Local", "TAZ", )
+        	idx = CreateMatrixIndex(areas[_area][1], mat, "Both", taz_vw+"|Local", "SubregionTAZ", )
             
             for _purp = 1 to purps.length do
                 purp = purps[_purp]
