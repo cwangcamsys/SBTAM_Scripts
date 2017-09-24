@@ -1719,49 +1719,35 @@ Macro "RPT LU Data" (Perf)
     //Update progres bar
     shared UT
 
-    //AT information
-    at_no = UT.Values(Perf.Info.AT)  //Returns a list of numbers only
-    at_names = UT.Keys(Perf.Info.AT)
-    
     //Define files
-    mdb_file = Perf.Args.Input.Database.Value
-	socio_file = Perf.Args.Output.TGN.Socio.Value
-	zdata_tname = Perf.Args.dbTable.TGN.zdata.Value
-	arate_tname = Perf.Args.dbTable.TGN.Arate.Value
+	socio_file = Perf.Args.Info.ModelDir + "SED\\model_sed_subregion.bin"
 
-	//Open database tables
     //Open tables and files
-	dsn_name = RunMacro("CreateDSN", mdb_file)
-	socio_vw = OpenTable("SEData", "FFB", {socio_file})
-	zdata_vw = RunMacro("OpenDSN", dsn_name, zdata_tname, , )
-	arate_vw = RunMacro("OpenDSN", dsn_name, arate_tname, "SORT", )
-	join_vw = JoinViews("SEData+Zdata", socio_vw+".TAZ", zdata_vw+".TAZ", )
+	socio_vw = OpenTable("SEData", "FFB", {socio_file})	
 	
-	//Get list of fields and units
-	{socio_flds, socio_units} = GetDataVectors(arate_vw+"|", {"LU_TYPE", "LU_UNIT"}, )
-	socio_desc =V2A(socio_flds + " (" + socio_units + ")") //TYPE (UNITS)
-	socio_flds = V2A(socio_flds)
-	socio_units = V2A(socio_units)
+	SetView(socio_vw)
+	{field_names,} = GetFields(socio_vw, "All")
+	Start_Loc = ArrayPosition(field_names, {"POP"}, )
+	End_Loc = ArrayPosition(field_names,{"PUBADM_EMP"}, )
+	socio_flds = Subarray(field_names, Start_Loc, End_Loc - Start_Loc + 1)
+	
+	v_County = GetDataVector(socio_vw + "|", "CNTY", )
+	a_County = SortArray(v2a(v_County), {{"Unique","True"}, {"Ascending","True"}})     
 	
 	//Create an array to hold the LU summary table
-	dim LUTable[socio_flds.length, at_no.length + 2]  //Summarize by AT + 2 for TOTAL and SOI
+	dim LUTable[socio_flds.length, a_County.length + 1]  //Summarize by AT + 2 for TOTAL and SOI
 	
-	//Read LU vectors and AT (Read all together, then separate the last vector)
-	LU = GetDataVectors(join_vw+"|", socio_flds+{"AT"}, )
-	AT = LU[LU.Length]
-	LU = Subarray(LU, 1, LU.Length - 1)
+	//Read LU vectors (Read all together)
+	LU = GetDataVectors(socio_vw+"|", socio_flds, )
 	
 	for i = 1 to socio_flds.length do
-		for j = 1 to at_no.length do
-			V = (if (AT = at_no[j]) then LU[i] else 0)
+		for j = 1 to a_County.length do
+			V = (if (v_County = a_County[j]) then LU[i] else 0)
 			LUTable[i][j] = VectorStatistic(V, "Sum", )
 			
 			//Accumulate total
-			LUTable[i][at_no.length+2] = nz(LUTable[i][at_no.length+2]) + nz(LUTable[i][j])
-			//Accumulate SOI Subtotal
-			if j < 6 then do //!!! hard-coded reference to AT numbers for SOI
-				LUTable[i][at_no.length+1] = nz(LUTable[i][at_no.length+1]) + nz(LUTable[i][j])
-			end
+			LUTable[i][a_County.length+1] = nz(LUTable[i][a_County.length+1]) + nz(LUTable[i][j])
+
 		end
 	end
     
@@ -1769,8 +1755,8 @@ Macro "RPT LU Data" (Perf)
     TB.Name = "Land Use Totals"
     
     TB.Table.TableData = LUTable
-    TB.Table.RowNames = socio_desc
-    TB.Table.ColNames = at_names+{"SOI Subtotal", "Total"}
+    TB.Table.RowNames = socio_flds //socio_desc
+    TB.Table.ColNames = a_County+{"Total"}
     TB.Table.Class = "dataframe no-last-row"
 
     Tables = {TB}
