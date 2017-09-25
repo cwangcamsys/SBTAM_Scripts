@@ -51,11 +51,11 @@ Dbox "Performance" (Perf)
 
 	checkbox "Title Page" 3, 7, 35, 1 
         Variable: sets.Report.[RPT Title Page]
-    checkbox "Input Files and Parameters" 3, 8.5, 35, 1 
-        Variable: sets.Report.[RPT Files]
-    checkbox "Input Network Summary*" 3, 10, 35, 1 
+    //checkbox "Input Files and Parameters" 3, 8.5, 35, 1 
+    //    Variable: sets.Report.[RPT Files]
+    checkbox "Input Network Summary*" 3, 8.5, 35, 1 
         Variable: sets.Report.[RPT Network Summary]
-    checkbox "Land Use Data Summary" 3, 11.5, 35, 1 
+    checkbox "Land Use Data Summary" 3, 10, 35, 1 
         Variable: sets.Report.[RPT LU Data]
     
     //Select all or none in this category
@@ -100,10 +100,10 @@ Dbox "Performance" (Perf)
 
     checkbox "Daily Validation Summary" 3, 18, 35, 1 
         Variable: sets.Report.[RPT Vehicle Validation DY]
-    checkbox "AM Validation Summary*" same, 19.5, 35, 1 
-        Variable: sets.Report.[RPT Vehicle Validation AM]
-    checkbox "PM Validation Summary*" same, 21, 35, 1 
-        Variable: sets.Report.[RPT Vehicle Validation PM]
+    //checkbox "AM Validation Summary*" same, 19.5, 35, 1 
+    //    Variable: sets.Report.[RPT Vehicle Validation AM]
+    //checkbox "PM Validation Summary*" same, 21, 35, 1 
+    //    Variable: sets.Report.[RPT Vehicle Validation PM]
 
 
     //Select all or none in this category
@@ -295,11 +295,11 @@ Class "Performance" (Args) //StartClass
         self.Report.[RPT Title Page].Section = 0              //Report section number
         self.Report.[RPT Title Page].Group = "basic"          //Report group (for on/off buttons)
                      
-        self.Report.[RPT Files].Contents = "Files and Settings"
-        self.Report.[RPT Files].Anchor = "Files"
-        self.Report.[RPT Files].Active = 1
-        self.Report.[RPT Files].Section = 1
-        self.Report.[RPT Files].Group = "basic"
+        //self.Report.[RPT Files].Contents = "Files and Settings"
+        //self.Report.[RPT Files].Anchor = "Files"
+        //self.Report.[RPT Files].Active = 1
+        //self.Report.[RPT Files].Section = 1
+        //self.Report.[RPT Files].Group = "basic"
                      
         self.Report.[RPT Network Summary].Contents = "Input Network Summary"
         self.Report.[RPT Network Summary].Anchor = "Network"
@@ -361,17 +361,17 @@ Class "Performance" (Args) //StartClass
         self.Report.[RPT Vehicle Validation DY].Section = 10
         self.Report.[RPT Vehicle Validation DY].Group = "validation"
         
-        self.Report.[RPT Vehicle Validation AM].Contents = "AM Vehicle Validation Summary"
-        self.Report.[RPT Vehicle Validation AM].Anchor = "Validation_AM"
-        self.Report.[RPT Vehicle Validation AM].Active = 1
-        self.Report.[RPT Vehicle Validation AM].Section = 11
-        self.Report.[RPT Vehicle Validation AM].Group = "validation"
-        
-        self.Report.[RPT Vehicle Validation PM].Contents = "PM Vehicle Validation Summary"
-        self.Report.[RPT Vehicle Validation PM].Anchor = "Validation_PM"
-        self.Report.[RPT Vehicle Validation PM].Active = 1
-        self.Report.[RPT Vehicle Validation PM].Section = 12
-        self.Report.[RPT Vehicle Validation PM].Group = "validation"
+        //self.Report.[RPT Vehicle Validation AM].Contents = "AM Vehicle Validation Summary"
+        //self.Report.[RPT Vehicle Validation AM].Anchor = "Validation_AM"
+        //self.Report.[RPT Vehicle Validation AM].Active = 1
+        //self.Report.[RPT Vehicle Validation AM].Section = 11
+        //self.Report.[RPT Vehicle Validation AM].Group = "validation"
+        //
+        //self.Report.[RPT Vehicle Validation PM].Contents = "PM Vehicle Validation Summary"
+        //self.Report.[RPT Vehicle Validation PM].Anchor = "Validation_PM"
+        //self.Report.[RPT Vehicle Validation PM].Active = 1
+        //self.Report.[RPT Vehicle Validation PM].Section = 12
+        //self.Report.[RPT Vehicle Validation PM].Group = "validation"
 		       
         
         //Identify report filename
