@@ -2566,7 +2566,7 @@ Macro "RPT Mode Choice" (Perf)
     //Join the taz_file and correlation_file, and copy the CNTY from taz_file to correlation_file
 	Opts = null
     Opts.Input.[Dataview Set] = {{correlation_file, taz_file, {"SUBZONE"}, {"SubregionTAZ"}}, "subregion_correlation+merged_ta"}
-    Opts.Global.Fields = {"subregion_correlation.CNTY"}
+    Opts.Global.Fields = {"Correlation.CNTY"}
     Opts.Global.Method = "Formula"
     Opts.Global.Parameter = "merged_taz_layer_Tier2.CNTY"
 
