@@ -2039,12 +2039,11 @@ Macro "RPT Trip Distribution" (Perf)
 	skmtt_cores = {"NON-TOLL TIME", "NON-TOLL TIME"}									//(with terminal time). SCAG might have only one time of travel time. Travel time with and without terminal time is set to be the same for now.
     skm_dist_cores = {"NON-TOLL DISTANCE", "NON-TOLL DISTANCE"}
 	
-    //Format strings for data columns
-    fmts = {,,,"*0.0%", "*0.0", "*0.0", "*0.0", "*0.0", "*0.0"}
-    Tables = null
-    
-    Dim Data[2] //for PK and OP, used to sum into daily at the end
-    
+    areas = Perf.ActiveAreas("Zones")
+	
+	SB_II_EI_EE_file = Perf.Args.Info.ModelDir + "User\\SB_II_IE_EE.mtx"		//CS: consider to create this file automatically
+	
+   
     //use matrix cores to get purpose names
 	purps = null
 	//new_cores = null
@@ -2063,224 +2062,382 @@ Macro "RPT Trip Distribution" (Perf)
 		if Right(purps[_purp],2) = "PK" then purps[_purp] = Substring(purps[_purp],1,StringLength(purps[_purp])-2)
 	end
 	
-	//dim purps[2]
-	////purps = null
-	//new_cores = null
-	//dim pa_file_cores[2, pa_file[1].length]
-	//for _per = 1 to periods.length do
-	//	for _pa_file = 1 to pa_file[_per].length do 
-	//		trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
-	//		new_cores = GetMatrixCoreNames(trp_mat)
-	//		purps[_per] = purps[_per] + new_cores
-	//		pa_file_cores[_per][_pa_file] = new_cores.length
-	//		trp_mat = null
-	//		new_cores = null
-	//	end	
-	//end	
-	
-	//purps = { "HBWD1", "HBWD2", "HBWD3", "HBWD4", "HBWD5",
-	//	      "HBWS1", "HBWS2", "HBWS3", "HBWS4", "HBWS5", 
-	//	      "HBSH1", "HBSH2", "HBSH3", "HBSH4", "HBSH5",
-	//	      "HBSR1", "HBSR2", "HBSR3", "HBSR4", "HBSR5", 
-	//	      "HBSP1", "HBSP2", "HBSP3", "HBSP4", "HBSP5",
-	//	      "HBO1", "HBO2", "HBO3", "HBO4", "HBO5",
-	//	      "HBSC",
-	//	      "HBCU",
- 	//	      "WBO",
-	//	      "OBO"}
-	
-	//to accumulate daily intermediate values
-	dim len_sumDY[purps.length]
-	dim time_sumDY[purps.length]
-	dim time_tt_sumDY[purps.length]	
-    
-    for _per = 1 to periods.length do
+	for _area = 1 to areas.length do
 		
-		Formats = null
+		Tables = null
+		Dim Data[2] //for PK and OP, used to sum into daily at the end
 
-        skm_mat = OpenMatrix(skm_file[_per], )
-        skm_cur = CreateMatrixCurrency(skm_mat, skm_cores[_per], , , )
-        skmtt_cur = CreateMatrixCurrency(skm_mat, skmtt_cores[_per], , , )
-        skmlen_cur = CreateMatrixCurrency(skm_mat, skm_dist_cores[_per], , , )
+		//to accumulate daily intermediate values
+		dim len_sumDY[purps.length]
+		dim time_sumDY[purps.length]
+		dim time_tt_sumDY[purps.length]			
 		
-		////use matrix cores to get purpose names
-		//purps = null
-		//new_cores = null
-		//dim pa_file_cores[pa_file[1].length]
-		//for _pa_file2 = 1 to pa_file[1].length do 
-		//	trp_mat = OpenMatrix(pa_file[1][_pa_file], )
-		//	new_cores = GetMatrixCoreNames(trp_mat)
-		//	purps = purps + new_cores						//Chao: reduced the dimentions for purps and pa_file_cores
-		//	pa_file_cores[_pa_file2] = new_cores.length
-		//	trp_mat = null
-		//	new_cores = null
-		//end
-		//
-		//if _per = 1 then do //initialize
-		//	//to accumulate daily intermediate values
-		//	dim len_sumDY[purps.length]
-		//	dim time_sumDY[purps.length]
-		//	dim time_tt_sumDY[purps.length]		
-		//end
-
-		n_purp = 0			// used to track the position in purps
-		
-		dim last_line[9]	// to accumulate for each time period
-		len_sum = 0
-		time_sum = 0
-		time_tt_sum = 0		
-		
-        for _pa_file = 1 to pa_file[1].length do			//for each pa matrix file
-			
-			trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
+		if areas[_area][1] = "SB County" then do 
+			dim len_ie_sumDY[purps.length]
+			dim time_ie_sumDY[purps.length]
+			dim len_ei_sumDY[purps.length]
+			dim time_ei_sumDY[purps.length]
+			dim len_ee_sumDY[purps.length]
+			dim time_ee_sumDY[purps.length]	
 	
-			t = SplitPath(pa_file[_per][_pa_file])
-			Opts = null
-			Opts.[File Name] = t[1]+t[2]+"__TEMP__SkimRpt.mtx"
-			Opts.Label = "Scratch"
-			Opts.Tables = {"DATA"}
-			Opts.[Memory Only] = "True"
-			tmp_mat = CopyMatrixStructure({skm_cur}, Opts)
-			tmp_cur = CreateMatrixCurrency(tmp_mat, "DATA", , , )
+			subregion_mat = OpenMatrix(SB_II_EI_EE_file, )
+			II_cur = CreateMatrixCurrency(subregion_mat, "I-I", , , )
+			IE_cur = CreateMatrixCurrency(subregion_mat, "I-E", , , )
+			EI_cur = CreateMatrixCurrency(subregion_mat, "E-I", , , )
+			EE_cur = CreateMatrixCurrency(subregion_mat, "E-E", , , )
+		end
+		
+		for _per = 1 to periods.length do
 			
-			purps2 = GetMatrixCoreNames(trp_mat)
+			Formats = null
+	
+			skm_mat = OpenMatrix(skm_file[_per], )
+			skm_cur = CreateMatrixCurrency(skm_mat, skm_cores[_per], , , )
+			skmtt_cur = CreateMatrixCurrency(skm_mat, skmtt_cores[_per], , , )
+			skmlen_cur = CreateMatrixCurrency(skm_mat, skm_dist_cores[_per], , , )
 			
-			//for _purp = 1 to pa_file_cores[_pa_file] do 	//for each core in the matrix
-			for _purp = 1 to purps2.length do 	//for each core in the matrix
+			n_purp = 0			// used to track the position in purps
+			
+			if areas[_area][1] = "Entire Model" then do 
+				dim last_line[9]	// to accumulate for each time period
+			end
+			if areas[_area][1] = "SB County" then do 
+				dim last_line[16]	// to accumulate for each time period
+				len_ie_sum = 0
+				time_ie_sum = 0	
+				len_ei_sum = 0
+				time_ei_sum = 0
+				len_ee_sum = 0
+				time_ee_sum = 0
+			end	
 				
-				n_purp = n_purp + 1
-				purp = purps2[_purp]
+			len_sum = 0			//for ii trips
+			time_sum = 0
+			time_tt_sum = 0
+			
+			for _pa_file = 1 to pa_file[1].length do			//for each pa matrix file
+				
+				trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
+		
+				t = SplitPath(pa_file[_per][_pa_file])
+				Opts = null
+				Opts.[File Name] = t[1]+t[2]+"__TEMP__SkimRpt.mtx"
+				Opts.Label = "Scratch"
+				Opts.Tables = {"DATA"}
+				Opts.[Memory Only] = "True"
+				tmp_mat = CopyMatrixStructure({skm_cur}, Opts)
+				tmp_cur = CreateMatrixCurrency(tmp_mat, "DATA", , , )
+				
+				purps2 = GetMatrixCoreNames(trp_mat)
+				
+				for _purp = 1 to purps2.length do 	//for each core in the matrix
+					
+					n_purp = n_purp + 1
+					purp = purps2[_purp]
+					if areas[_area][1] = "Entire Model" then do 
+					
+						//Format strings for data columns
+						fmts = {,,,"*0.0%", "*0.0", "*0.0", "*0.0", "*0.0", "*0.0"}	
+						dim line[9]
+						
+						//(1)trips (2)intra (3)inter (4)%inter (5)miles (6)min (7)mph (8) min(term) (9)mph(term)
+						trp_cur = CreateMatrixCurrency(trp_mat, purp, , , )
+					
+						//Total and intrazonal trips
+						line[1] = VectorStatistic(GetMatrixVector(trp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[2] = VectorStatistic(GetMatrixVector(trp_cur, {{"Diagonal", "Column"}}), "Sum", )
+						line[3] = line[1] - line[2]
+						line[4] = line[2] / line[1]
+						
+						//Time and speed
+					
+						//Avg Length (Miles)
+						tmp_cur := skmlen_cur * trp_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[5] = V / line[1]
+						len_sum = len_sum + V
+						len_sumDY[n_purp] = nz(len_sumDY[n_purp]) + V
+						
+						//Avg time (no termainl time)
+						tmp_cur := skm_cur * trp_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[6] = V / line[1]
+						time_sum = time_sum + V
+						time_sumDY[n_purp] = nz(time_sumDY[n_purp]) + V
+						
+						//Avg Speed (no term)
+						line[7] = line[5] / line[6] * 60
+						
+						//Avg time (with termainl time)
+						tmp_cur := skmtt_cur * trp_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[8] = V / line[1]
+						time_tt_sum = time_tt_sum + V
+						time_tt_sumDY[n_purp] = nz(time_tt_sumDY[n_purp]) + V
+						
+						//Avg Speed (no term)
+						line[9] = line[5] / line[8] * 60
+						
+						
+						//Add line to table, address formatting
+						Data[_per] = Data[_per] + {CopyArray(line)}
+						Formats = Formats + {fmts}
+						
+						//Sum totals
+						last_line[1] = nz(last_line[1]) + line[1]
+						last_line[2] = nz(last_line[2]) + line[2]
+						last_line[3] = nz(last_line[3]) + line[3]
+						last_line[4] = nz(last_line[2]) / last_line[1]
+						
+						//Close innermost loop matrix currency
+						trp_cur = null
+					end // end of if "entire model"	
+					
+					if areas[_area][1] = "SB County" then do 	
+
+						//Format strings for data columns
+						fmts = {,,,"*0.0%", "*0.0", "*0.0", "*0.0", , "*0.0", "*0.0", , "*0.0", "*0.0", , "*0.0", "*0.0"}	
+						dim line[16]
+						//(1)II trips (2)intra (3)inter (4)%inter (5)miles (6)min (7)mph 
+						//(8) IE trips (9) IE trip average trip distance (10) IE trip average trip length 
+						//(11) EI trips (12) EI trip average trip distance (13) EI trip average trip length 
+						//(14) EE trips (15) EE trip average trip distance (16) EE trip average trip length 
+						trp_cur = CreateMatrixCurrency(trp_mat, purp, , , )
+						tmp_cur := trp_cur * II_cur
+					
+						//Total and intrazonal trips
+						line[1] = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[2] = VectorStatistic(GetMatrixVector(tmp_cur, {{"Diagonal", "Column"}}), "Sum", )
+						line[3] = line[1] - line[2]
+						line[4] = line[2] / line[1]
+						
+						//Time and speed
+					
+						//Avg Length (Miles)
+						tmp_cur := skmlen_cur * trp_cur * II_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[5] = V / line[1]
+						len_sum = len_sum + V
+						len_sumDY[n_purp] = nz(len_sumDY[n_purp]) + V
+						
+						//Avg time (no termainl time)
+						tmp_cur := skm_cur * trp_cur * II_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[6] = V / line[1]
+						time_sum = time_sum + V
+						time_sumDY[n_purp] = nz(time_sumDY[n_purp]) + V
+						
+						//Avg Speed (no term)
+						line[7] = line[5] / line[6] * 60
+						
+						// IE trips
+						tmp_cur := trp_cur * IE_cur
+						//Total and intrazonal trips
+						line[8] = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						//Avg Length (Miles)
+						tmp_cur := skmlen_cur * trp_cur * IE_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[9] = V / line[8]
+						len_ie_sum = len_ie_sum + V
+						len_ie_sumDY[n_purp] = nz(len_ie_sumDY[n_purp]) + V
+						//Avg time (no termainl time)
+						tmp_cur := skm_cur * trp_cur * IE_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[10] = V / line[8]
+						time_ie_sum = time_ie_sum + V
+						time_ie_sumDY[n_purp] = nz(time_ie_sumDY[n_purp]) + V
+						
+						// EI trips
+						tmp_cur := trp_cur * EI_cur
+						//Total and intrazonal trips
+						line[11] = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						//Avg Length (Miles)
+						tmp_cur := skmlen_cur * trp_cur * EI_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[12] = V / line[11]
+						len_ei_sum = len_ei_sum + V
+						len_ei_sumDY[n_purp] = nz(len_ei_sumDY[n_purp]) + V
+						//Avg time (no termainl time)
+						tmp_cur := skm_cur * trp_cur * EI_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[13] = V / line[11]
+						time_ei_sum = time_ei_sum + V
+						time_ei_sumDY[n_purp] = nz(time_ei_sumDY[n_purp]) + V
+						
+						// EE trips
+						tmp_cur := trp_cur * EE_cur
+						//Total and intrazonal trips
+						line[14] = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						//Avg Length (Miles)
+						tmp_cur := skmlen_cur * trp_cur * EE_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[15] = V / line[14]
+						len_ee_sum = len_ee_sum + V
+						len_ee_sumDY[n_purp] = nz(len_ee_sumDY[n_purp]) + V
+						//Avg time (no termainl time)
+						tmp_cur := skm_cur * trp_cur * EE_cur
+						V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
+						line[16] = V / line[14]
+						time_ee_sum = time_ee_sum + V
+						time_ee_sumDY[n_purp] = nz(time_ee_sumDY[n_purp]) + V						
+						
+						//Add line to table, address formatting
+						Data[_per] = Data[_per] + {CopyArray(line)}
+						Formats = Formats + {fmts}
+						
+						//Sum totals
+						last_line[1] = nz(last_line[1]) + line[1]
+						last_line[2] = nz(last_line[2]) + line[2]
+						last_line[3] = nz(last_line[3]) + line[3]
+						last_line[4] = nz(last_line[2]) / last_line[1]
+						last_line[8] = nz(last_line[8]) + line[8]		//IE trips
+						last_line[11] = nz(last_line[11]) + line[11]	//EI trips
+						last_line[14] = nz(last_line[14]) + line[14]	//EE trips
+						
+						//Close innermost loop matrix currency
+						trp_cur = null
+					end	// end of if "County"
+				end	//end of _purp
+				
+				trp_mat = null
+				tmp_mat = null
+				tmp_cur = null
+				
+			end	//end of _pa_file	
+				
+			//Calculate total time and speed
+			last_line[5] = len_sum / last_line[1]
+			last_line[6] = time_sum / last_line[1]
+			last_line[7] = last_line[5] / last_line[6] * 60
+			
+			if areas[_area][1] = "Entire Model" then do 
+				last_line[8] = time_tt_sum / last_line[1]
+				last_line[9] = last_line[5] / last_line[8] * 60
+			end
+			
+			if areas[_area][1] = "SB County" then do 
+				last_line[9] = len_ie_sum / last_line[8]
+				last_line[10] = time_ie_sum / last_line[8]
+				last_line[12] = len_ei_sum / last_line[11]
+				last_line[13] = time_ei_sum / last_line[11]
+				last_line[15] = len_ee_sum / last_line[14]
+				last_line[16] = time_ee_sum / last_line[14]				
+			end	
+			
+			Data[_per] = Data[_per] + {CopyArray(last_line)}
+			Formats = Formats + {fmts}
+			
+			TB = null
+			//TB.Section1 = periods[_per]
+			TB.Section1 = areas[_area][1]
+			TB.Name = periods[_per] + " Trip Distribution Summary" + ' <span class="grey">('+areas[_area][1]+')</span>'
+			TB.Table.TableData = CopyArray(Data[_per])
+			TB.Table.Formats = CopyArray(Formats)
+			TB.Table.RowNames = purps + {"All Trips"}
+			TB.Table.Class = "dataframe no-last-col"			
+
+			if areas[_area][1] = "Entire Model" then do 
+				TB.Table.ColNames = {"Purpose", "Trips", "Intrazonal", "Interzonal", "% Intrazonal", "Avg Length (miles)", "Avg Time (min)", "Avg Speed", "Avg Time (min)*", "Avg Speed*"}
+				TB.Footnote = "* Includes terminal time"
+			end
+			if areas[_area][1] = "SB County" then do 
+				TB.Table.ColNames = {"Purpose", "II Trips", "II Intrazonal", "II Interzonal", "% Intrazonal", "Avg II Length (miles)", "Avg II Time (min)", "Avg II Speed", "IE Trips", "Avg IE Length (miles)", "Avg IE Time (min)", "EI Trips", "Avg EI Length (miles)", "Avg EI Time (min)", "EE Trips", "Avg EE Length (miles)", "Avg EE Time (min)" }				
+			end	
+			Tables = Tables + {CopyArray(TB)}
+			
+			skm_mat = null
+			skm_cur = null
+			skmtt_cur = null
+			skmlen_cur = null
+		
+		end //_per
+    
+		//Add daily table by summing PK and OP
+		len_sumDY = len_sumDY + {Sum(len_sumDY)}
+		time_sumDY = time_sumDY + {Sum(time_sumDY)}
+		if areas[_area][1] = "Entire Model" then do 
+			time_tt_sumDY = time_tt_sumDY + {Sum(time_tt_sumDY)}
+		end	
+
+		if areas[_area][1] = "SB County" then do 	
+			len_ie_sumDY = len_ie_sumDY + {Sum(len_ie_sumDY)}
+			time_ie_sumDY = time_ie_sumDY + {Sum(time_ie_sumDY)}
+			len_ei_sumDY = len_ei_sumDY + {Sum(len_ei_sumDY)}
+			time_ei_sumDY = time_ei_sumDY + {Sum(time_ei_sumDY)}
+			len_ee_sumDY = len_ee_sumDY + {Sum(len_ee_sumDY)}
+			time_ee_sumDY = time_ee_sumDY + {Sum(time_ee_sumDY)}			
+		end	
+			
+		
+		DataDY = null
+		for _purp = 1 to Data[1].length do
+			if areas[_area][1] = "Entire Model" then do 
 				dim line[9]
-				//(1)trips (2)intra (3)inter (4)%inter (5)miles (6)min (7)mph (8) min(term) (9)mph(term)
-				trp_cur = CreateMatrixCurrency(trp_mat, purp, , , )
+			end
+			if areas[_area][1] = "SB County" then do 
+				dim line[16]
+			end			
+
+			for ii = 1 to 3 do	
+				line[ii] = Data[1][_purp][ii] + Data[2][_purp][ii]
+			end
+			line[4] = line[2] / line[1]
 			
-				//Total and intrazonal trips
-				line[1] = VectorStatistic(GetMatrixVector(trp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-				line[2] = VectorStatistic(GetMatrixVector(trp_cur, {{"Diagonal", "Column"}}), "Sum", )
-				line[3] = line[1] - line[2]
-				line[4] = line[2] / line[1]
-				
-				//Time and speed
+			//Speeds and times
 			
-				//Avg Length (Miles)
-				tmp_cur := skmlen_cur * trp_cur
-				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-				line[5] = V / line[1]
-				len_sum = len_sum + V
-				//len_sumDY[_purp] = nz(len_sumDY[_purp]) + V
-				len_sumDY[n_purp] = nz(len_sumDY[n_purp]) + V
-				
-				//Avg time (no termainl time)
-				tmp_cur := skm_cur * trp_cur
-				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-				line[6] = V / line[1]
-				time_sum = time_sum + V
-				//time_sumDY[_purp] = nz(time_sumDY[_purp]) + V
-				time_sumDY[n_purp] = nz(time_sumDY[n_purp]) + V
-				
-				//Avg Speed (no term)
-				line[7] = line[5] / line[6] * 60
-				
-				//Avg time (with termainl time)
-				tmp_cur := skmtt_cur * trp_cur
-				V = VectorStatistic(GetMatrixVector(tmp_cur, {{"Marginal", "Row Sum"}}), "Sum", )
-				line[8] = V / line[1]
-				time_tt_sum = time_tt_sum + V
-				//time_tt_sumDY[_purp] = nz(time_tt_sumDY[_purp]) + V
-				time_tt_sumDY[n_purp] = nz(time_tt_sumDY[n_purp]) + V
-				
-				//Avg Speed (no term)
+			line[5] = len_sumDY[_purp] / line[1]
+			line[6] = time_sumDY[_purp] / line[1]
+			line[7] = line[5] / line[6] * 60
+			
+			if areas[_area][1] = "Entire Model" then do 
+				line[8] = time_tt_sumDY[_purp] / line[1]
 				line[9] = line[5] / line[8] * 60
-				
-				
-				//Add line to table, address formatting
-				Data[_per] = Data[_per] + {CopyArray(line)}
-				Formats = Formats + {fmts}
-				
-				//Sum totals
-				last_line[1] = nz(last_line[1]) + line[1]
-				last_line[2] = nz(last_line[2]) + line[2]
-				last_line[3] = nz(last_line[3]) + line[3]
-				last_line[4] = nz(last_line[2]) / last_line[1]
-				
-				//Close innermost loop matrix currency
-				trp_cur = null
-			end	//end of _purp
+			end
+			if areas[_area][1] = "SB County" then do 
+				line[8] = Data[1][_purp][8] + Data[2][_purp][8]
+				line[9] = len_ie_sumDY[_purp] / line[8]
+				line[10] = time_ie_sumDY[_purp] / line[8]
+				line[11] = Data[1][_purp][11] + Data[2][_purp][11]
+				line[12] = len_ei_sumDY[_purp] / line[11]
+				line[13] = time_ei_sumDY[_purp] / line[11]
+				line[14] = Data[1][_purp][14] + Data[2][_purp][14]
+				line[15] = len_ee_sumDY[_purp] / line[14]
+				line[16] = time_ee_sumDY[_purp] / line[14]
+			end	
 			
-			trp_mat = null
-			tmp_mat = null
-			tmp_cur = null
+			DataDY = DataDY + {CopyArray(line)}
 			
-		end	//end of _pa_file	
-			
-		//Calculate total time and speed
-		last_line[5] = len_sum / last_line[1]
-		last_line[6] = time_sum / last_line[1]
-		last_line[7] = last_line[5] / last_line[6] * 60
-		last_line[8] = time_tt_sum / last_line[1]
-		last_line[9] = last_line[5] / last_line[8] * 60
-		
-		Data[_per] = Data[_per] + {CopyArray(last_line)}
-		Formats = Formats + {fmts}
-		
-        TB = null
-        TB.Section1 = periods[_per]
-        TB.Name = "Trip Distribution Summary"
-        TB.Footnote = "* Includes terminal time"
-        TB.Table.TableData = CopyArray(Data[_per])
-        TB.Table.Formats = CopyArray(Formats)
-        TB.Table.RowNames = purps + {"All Trips"}
-        TB.Table.ColNames = {"Purpose", "Trips", "Intrazonal", "Interzonal", "% Intrazonal", "Avg Length (miles)", "Avg Time (min)", "Avg Speed", "Avg Time (min)*", "Avg Speed*"}
-        TB.Table.Class = "dataframe no-last-col"
-        
-        Tables = Tables + {CopyArray(TB)}
-        
- 
-        skm_mat = null
-        skm_cur = null
-        skmtt_cur = null
-        skmlen_cur = null
+		end
 
-    
-    end //_per
-	
-    //Add daily table by summing PK and OP
-    len_sumDY = len_sumDY + {Sum(len_sumDY)}
-    time_sumDY = time_sumDY + {Sum(time_sumDY)}
-    time_tt_sumDY = time_tt_sumDY + {Sum(time_tt_sumDY)}
-    DataDY = null
-    for _purp = 1 to Data[1].length do
-        dim line[9]
-        for ii = 1 to 3 do
-            line[ii] = Data[1][_purp][ii] + Data[2][_purp][ii]
-        end
-        line[4] = line[2] / line[1]
-        
-        //Speeds and times
-        
-        line[5] = len_sumDY[_purp] / line[1]
-        line[6] = time_sumDY[_purp] / line[1]
-        line[7] = line[5] / line[6] * 60
-        line[8] = time_tt_sumDY[_purp] / line[1]
-        line[9] = line[5] / line[8] * 60
-        
-        DataDY = DataDY + {CopyArray(line)}
-        
-    end
-    
-    TB = null
-    TB.Section1 = "Daily"
-    TB.Name = "Trip Distribution Summary"
-    TB.Footnote = "* Includes terminal time"
-    TB.Table.TableData = CopyArray(DataDY)
-    TB.Table.Formats = CopyArray(Formats) //remains from pk / op
-    TB.Table.RowNames = purps + {"All Trips"}
-    TB.Table.ColNames = {"Purpose", "Trips", "Intrazonal", "Interzonal", "% Intrazonal", "Avg Length (miles)", "Avg Time (min)", "Avg Speed", "Avg Time (min)*", "Avg Speed*"}
-    TB.Table.Class = "dataframe no-last-col"
-    
-    Tables = {CopyArray(TB)} + Tables
-
-    Perf.WriteTables(Tables, )
+		TB = null
+		//TB.Section1 = "Daily"
+		TB.Section1 = areas[_area][1]
+		TB.Name = "Daily Trip Distribution Summary" + ' <span class="grey">('+areas[_area][1]+')</span>'
+		TB.Table.TableData = CopyArray(DataDY)
+		TB.Table.Formats = CopyArray(Formats) //remains from pk / op
+		TB.Table.RowNames = purps + {"All Trips"}
+		TB.Table.Class = "dataframe no-last-col"
+		if areas[_area][1] = "Entire Model" then do 
+			TB.Table.ColNames = {"Purpose", "Trips", "Intrazonal", "Interzonal", "% Intrazonal", "Avg Length (miles)", "Avg Time (min)", "Avg Speed", "Avg Time (min)*", "Avg Speed*"}
+			TB.Footnote = "* Includes terminal time"
+		end
+		if areas[_area][1] = "SB County" then do 
+			TB.Table.ColNames = {"Purpose", "II Trips", "II Intrazonal", "II Interzonal", "% Intrazonal", "Avg II Length (miles)", "Avg II Time (min)", "Avg II Speed", "IE Trips", "Avg IE Length (miles)", "Avg IE Time (min)", "EI Trips", "Avg EI Length (miles)", "Avg EI Time (min)", "EE Trips", "Avg EE Length (miles)", "Avg EE Time (min)" }				
+		end			
+		
+		Tables = {CopyArray(TB)} + Tables		
+		
+		if areas[_area][1] = "SB County" then do
+			subregion_mat = null
+			II_cur = null
+			IE_cur = null
+			EI_cur = null
+			EE_cur = null
+		end		
+		
+	    Perf.WriteTables(Tables, )	
+		
+	end // end of _area	
     
     Return(True)
 EndMacro
