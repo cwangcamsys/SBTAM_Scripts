@@ -2118,6 +2118,12 @@ Macro "RPT Trip Distribution" (Perf)
 			for _pa_file = 1 to pa_file[1].length do			//for each pa matrix file
 				
 				trp_mat = OpenMatrix(pa_file[_per][_pa_file], )
+				
+				//Drop "QuickSum" if exist
+				purps2 = GetMatrixCoreNames(trp_mat)
+				pos_quicksum = ArrayPosition(purps2,{"QuickSum"},)
+				if pos_quicksum <> 0 then DropMatrixCore(trp_mat, "QuickSum")
+				purps2 = GetMatrixCoreNames(trp_mat)
 		
 				t = SplitPath(pa_file[_per][_pa_file])
 				Opts = null
