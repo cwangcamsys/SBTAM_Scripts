@@ -28,6 +28,10 @@
 // NOTE: If values here change, many columns will also need to be updated (search fore colhead).
 // ****************************************************************************************************************
 //      
+// Modifications on 3/30/2018
+// For transit trips in mode choice summary, summarize to be consistent with "Transit_AM_OD.mtx"
+// The previous versions are consistent with the "PK_HBW_trip_summary.bin"
+
 Dbox "Performance" (Perf)
 
     init do
@@ -2694,6 +2698,7 @@ EndMacro
 // ****************************************************************************************************************
 // &&& Mode Choice Summary
 //  Summarizes results of mode choice
+// 02/25/2018 Summarize for all SB II, IE and EI trips
 //
 Macro "RPT Mode Choice" (Perf)
 
@@ -2708,10 +2713,17 @@ Macro "RPT Mode Choice" (Perf)
 	for _per = 1 to periods.length do
 		for _purp = 1 to purp_names.length do
 			non_transit_file[_per][_purp] = Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_HAUPAdTrips_Tier2.mtx"
-			transit_file[_per][_purp] = {Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu1PAcTrips.mtx",		//Bus1
-										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu2PAcTrips.mtx",		//Bus2
-										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_CMRPAcTrips.mtx",		//Commuter Rail
-										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_URRPAcTrips.mtx"}		//Urban Rail
+			//transit_file[_per][_purp] = {Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu1PAcTrips.mtx",		//Bus1
+			//							 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu2PAcTrips.mtx",		//Bus2
+			//							 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_CMRPAcTrips.mtx",		//Commuter Rail
+			//							 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_URRPAcTrips.mtx"}		//Urban Rail
+
+			// Used for mode choice calibration
+			transit_file[_per][_purp] = {Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu1PAcTrips_Tier2.mtx",		//Bus1
+										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_Bu2PAcTrips_Tier2.mtx",		//Bus2
+										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_CMRPAcTrips_Tier2.mtx",		//Commuter Rail
+										 Perf.Args.Info.ModelDir + "msplit\\Outputs\\" + periods[_per] + "_" + purp_names[_purp] + "_URRPAcTrips_Tier2.mtx"}		//Urban Rail
+										 
 		end
 	end	
 	sum_file = 	Perf.Args.Info.ModelDir + "msplit\\Reports\\Subregion_Mode_Choice_Summary.bin"
@@ -2719,20 +2731,29 @@ Macro "RPT Mode Choice" (Perf)
 	//TAZ files and subregion correlation files to create the index for sub-regions
 	taz_file = Perf.Args.Info.ModelDir + "\\Geography\\merged_taz_layer_Tier2.bin"	
 	correlation_file = Perf.Args.Info.ModelDir + "\\User\\subregion_correlation.bin"	
+	SB_II_EI_EE_file = Perf.Args.Info.ModelDir + "User\\SB_II_IE_EE.mtx"		//CS: consider to create this file automatically
+	
+	m_subregion = OpenMatrix(SB_II_EI_EE_file, )
+	//mc_subregion = CreateMatrixCurrency(m_subregion, "I-I", , , )
+	mc_subregion = CreateMatrixCurrency(m_subregion, "II_IE_EI", , , )
+	
+	
 	//Add County Information in the correlation file, which will be used for county level analysis 
 	corr_vw = OpenTable("Correlation", "FFB", {correlation_file,})
     SetView(corr_vw)
-	NewLinkFlds = {{"CNTY", "Integer"}}			
+	NewLinkFlds = {{"CNTY_ID", "Integer"}}			
 	if !RunMacro("TCB Run Macro", 1, "TCB Add View Fields", {corr_vw, NewLinkFlds}) then goto quit	
 	//CloseView(corr_vw)
-
+    
     //Join the taz_file and correlation_file, and copy the CNTY from taz_file to correlation_file
 	Opts = null
     Opts.Input.[Dataview Set] = {{correlation_file, taz_file, {"SUBZONE"}, {"SubregionTAZ"}}, "subregion_correlation+merged_ta"}
-    Opts.Global.Fields = {"Correlation.CNTY"}
+    //Opts.Global.Fields = {"Correlation.CNTY"}
+	Opts.Global.Fields = {"CNTY_ID"}
     Opts.Global.Method = "Formula"
-    Opts.Global.Parameter = "merged_taz_layer_Tier2.CNTY"
-
+    //Opts.Global.Parameter = "merged_taz_layer_Tier2.CNTY"
+	Opts.Global.Parameter = "CNTY"
+    
     ret_value = RunMacro("TCB Run Operation", "Fill Dataview", Opts, &Ret)
 	
 	//Create the model choice summmary table
@@ -2756,7 +2777,7 @@ Macro "RPT Mode Choice" (Perf)
 			//SetView(corr_vw)
 			corr_vw = OpenTable("Correlation", "FFB", {correlation_file,})
 			SetView(corr_vw)			
-			CreateExpression(corr_vw, "County", "CNTY", )
+			CreateExpression(corr_vw, "County", "CNTY_ID", )
 			n = SelectByQuery(areas[_area][1], "Several", areas[_area][2],)
 		end
 		
@@ -2765,20 +2786,30 @@ Macro "RPT Mode Choice" (Perf)
 				
 				if periods[_per] <> "DY" then do 
 
+					
+					
 					//Open Non-transit file
-					mat = OpenMatrix(non_transit_file[_per][_purp], ) 
+					
+					tmp_file = GetTempFileName(".mtx")
+					CopyFile(non_transit_file[_per][_purp], tmp_file)
+					
+					mat = OpenMatrix(tmp_file, ) 
 					mat_cores = GetMatrixCoreNames(mat)
 					dim a_sum[mat_cores.length]
 					dim a_mode[mat_cores.length]
 					a_mode = CopyArray(mat_cores)
 					
 					if areas[_area][1] <> "Entire Model" then do //Set matrix index
-						{mat_indexes,} = GetMatrixIndexNames(mat)
-						if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(mat, areas[_area][1])
-						CreateMatrixIndex(areas[_area][1], mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
-						SetMatrixIndex(mat, areas[_area][1], areas[_area][1])
+						//{mat_indexes,} = GetMatrixIndexNames(mat)
+						//if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(mat, areas[_area][1])
+						//CreateMatrixIndex(areas[_area][1], mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
+						//SetMatrixIndex(mat, areas[_area][1], areas[_area][1])
+						for _core = 1 to mat_cores.length do 
+							index = null
+							mc_mat = CreateMatrixCurrency(mat, mat_cores[_core], index, index, )	
+							mc_mat := mc_mat * mc_subregion
+						end	
 					end 
-	
 					
 					stat_array = MatrixStatistics(mat, )
 					for _core = 1 to mat_cores.length do 
@@ -2789,35 +2820,71 @@ Macro "RPT Mode Choice" (Perf)
 	
 					//for Bu1PAcTrips_Tier2.mtx
 					
-					t_mat = OpenMatrix(transit_file[_per][_purp][1], ) 
+					tmp_file = GetTempFileName(".mtx")
+					CopyFile(transit_file[_per][_purp][1], tmp_file)
+					
+					t_mat = OpenMatrix(tmp_file, ) 
 					t_mat_cores = GetMatrixCoreNames(t_mat)
 					dim a_sum_t[t_mat_cores.length]
 					a_mode = a_mode + t_mat_cores			//for Bu1PAcTrips_Tier2.mtx
 					
 					if areas[_area][1] <> "Entire Model" then do //Set matrix index
-						{mat_indexes,} = GetMatrixIndexNames(t_mat)
-						if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
-						CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
-						SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						//{mat_indexes,} = GetMatrixIndexNames(t_mat)
+						//if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
+						//CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
+						//SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						for _core = 1 to t_mat_cores.length do 
+							index = null
+							mc_mat = CreateMatrixCurrency(t_mat, t_mat_cores[_core], index, index, )	
+							mc_mat := mc_mat * mc_subregion
+						end							
 					end 	
 					
 					t_stat_array = MatrixStatistics(t_mat, )
 					for _core = 1 to t_mat_cores.length do 
 						a_sum_t[_core] = t_stat_array.(t_mat_cores[_core]).Sum
-					end	
+					end
+					
+					num_cores_Bu1 = t_mat_cores.length	// Corrected the error in previous versions on 4/1/2018. num_cores_Bu1 will be used to sum all transit trips.
 					
 					a_sum = a_sum + a_sum_t
 					t_mat = null
+					t_mat_cores = null
 	
+					
+					// for Bu2PAcTrips_Tier2.mtx, CMRPAcTrips_Tier2.mtx and URRPAcTrips_Tier2.mtx
+					// It was found that after mode choice, the matrix core names are not "Table1" instead of the actual core names. Rename them all here. 04/02/2018
+					for _tmode = 2 to 4 do 
+						t_mat = OpenMatrix(transit_file[_per][_purp][_tmode],)
+						t_mat_cores = GetMatrixCoreNames(t_mat)
+						if t_mat_cores[1] = "Table 1" then do 
+							if _tmode = 2 then new_core_names = {"Drive Express Bus", "Drive Transitway Bus", "Drive BRT", "Drive All"}
+							if _tmode = 3 or _tmode = 4 then new_core_names = {"Bus Access", "All Access", "Bus/Walk Egress"}
+							SetMatrixCoreNames(t_mat, new_core_names)
+						end	
+						t_mat = null
+						new_core_names = null
+					end
+					//end of modification on 4/2/2018
+					
 					//for Bu2PAcTrips_Tier2.mtx	
 					//Use the "Drive Express Bus", "Drive Transitway Bus" and "Drive BRT" to replace the values from Bu1PAcTrips_Tier2.mtx	
 	
-					t_mat = OpenMatrix(transit_file[_per][_purp][2], ) 
+					tmp_file = GetTempFileName(".mtx")
+					CopyFile(transit_file[_per][_purp][2], tmp_file)					
+					
+					t_mat = OpenMatrix(tmp_file, ) 
+					t_mat_cores = GetMatrixCoreNames(t_mat)
 					if areas[_area][1] <> "Entire Model" then do //Set matrix index
-						{mat_indexes,} = GetMatrixIndexNames(t_mat)
-						if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
-						CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
-						SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						//{mat_indexes,} = GetMatrixIndexNames(t_mat)
+						//if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
+						//CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
+						//SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						for _core = 1 to t_mat_cores.length do 
+							index = null
+							mc_mat = CreateMatrixCurrency(t_mat, t_mat_cores[_core], index, index, )	
+							mc_mat := mc_mat * mc_subregion
+						end							
 					end 						
 					t_stat_array = MatrixStatistics(t_mat, )				
 					
@@ -2829,39 +2896,86 @@ Macro "RPT Mode Choice" (Perf)
 	
 					loc = ArrayPosition(a_mode, {"Drive to BRT"}, ) 
 					if loc > 0 then a_sum[loc] = t_stat_array.[Drive BRT].Sum
-					t_mat = null				
+					t_mat = null
+					t_mat_cores = null	
 					
 					//for CMRPAcTrips_Tier2.mtx	
 					//Use the "Bus Access" to replace the values from Bu1PAcTrips_Tier2.mtx	
-	
-					t_mat = OpenMatrix(transit_file[_per][_purp][3], ) 
+
+					tmp_file = GetTempFileName(".mtx")
+					CopyFile(transit_file[_per][_purp][3], tmp_file)	
+					
+					t_mat = OpenMatrix(tmp_file, ) 
+					t_mat_cores = GetMatrixCoreNames(t_mat)					
 					if areas[_area][1] <> "Entire Model" then do //Set matrix index
-						{mat_indexes,} = GetMatrixIndexNames(t_mat)
-						if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
-						CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
-						SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						//{mat_indexes,} = GetMatrixIndexNames(t_mat)
+						//if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
+						//CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
+						//SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						for _core = 1 to t_mat_cores.length do 
+							index = null
+							mc_mat = CreateMatrixCurrency(t_mat, t_mat_cores[_core], index, index, )	
+							mc_mat := mc_mat * mc_subregion
+						end							
 					end 						
 					t_stat_array = MatrixStatistics(t_mat, )				
 					
 					loc = ArrayPosition(a_mode, {"Bus to Commuter Rail"}, ) 
 					if loc > 0 then a_sum[loc] = t_stat_array.[Bus Access].Sum
-					t_mat = null					
+					
+					//Modifications on 3/30/2018
+					loc = ArrayPosition(a_mode, {"Walk to Commuter Rail"}, ) 				// Notes on 03/30/2018. The matrix cores don't match. But the total purpose is just to get the total transit trips and the cores don't matter. 
+					if loc > 0 then a_sum[loc] = t_stat_array.[All Access].Sum
+					n_commuter = a_sum[loc]
+					
+					loc = ArrayPosition(a_mode, {"PNR to Commuter Rail"}, ) 
+					if loc > 0 then a_sum[loc] = t_stat_array.[Bus/Walk Egress].Sum
+					
+					loc = ArrayPosition(a_mode, {"KNR to Commuter Rail"}, ) 
+					if loc > 0 then a_sum[loc] = 0					
+					//end of modifications on 3/30/2018
+					
+					t_mat = null
+					t_mat_cores = null	
 	
 					//for URRPAcTrips_Tier2.mtx	
 					//Use the "Bus Access" to replace the values from Bu1PAcTrips_Tier2.mtx	
-	
-					t_mat = OpenMatrix(transit_file[_per][_purp][4], ) 
+					
+					tmp_file = GetTempFileName(".mtx")
+					CopyFile(transit_file[_per][_purp][4], tmp_file)	
+					
+					t_mat = OpenMatrix(tmp_file, ) 
+					t_mat_cores = GetMatrixCoreNames(t_mat)						
 					if areas[_area][1] <> "Entire Model" then do //Set matrix index
-						{mat_indexes,} = GetMatrixIndexNames(t_mat)
-						if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
-						CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
-						SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						//{mat_indexes,} = GetMatrixIndexNames(t_mat)
+						//if ArrayPosition(mat_indexes, {areas[_area][1]}, ) then	DeleteMatrixIndex(t_mat, areas[_area][1])
+						//CreateMatrixIndex(areas[_area][1], t_mat, "Both", corr_vw+"|"+areas[_area][1], "Sequence_ID_Tier1", "Sequence_ID_Tier1",)
+						//SetMatrixIndex(t_mat, areas[_area][1], areas[_area][1])
+						for _core = 1 to t_mat_cores.length do 
+							index = null
+							mc_mat = CreateMatrixCurrency(t_mat, t_mat_cores[_core], index, index, )	
+							mc_mat := mc_mat * mc_subregion
+						end								
 					end 						
 					t_stat_array = MatrixStatistics(t_mat, )				
 					
 					loc = ArrayPosition(a_mode, {"Bus to Urban Rail"}, ) 
 					if loc > 0 then a_sum[loc] = t_stat_array.[Bus Access].Sum
-					t_mat = null				
+					
+					//Modifications on 3/30/2018
+					loc = ArrayPosition(a_mode, {"Walk to Urban Rail"}, ) 				// Notes on 03/30/2018. The matrix cores don't match. But the total purpose is just to get the total transit trips and the cores don't matter. 
+					if loc > 0 then a_sum[loc] = t_stat_array.[All Access].Sum
+					n_commuter = n_commuter + a_sum[loc]
+					
+					loc = ArrayPosition(a_mode, {"PNR to Urban Rail"}, ) 
+					if loc > 0 then a_sum[loc] = t_stat_array.[Bus/Walk Egress].Sum
+					
+					loc = ArrayPosition(a_mode, {"KNR to Urban Rail"}, ) 
+					if loc > 0 then a_sum[loc] = 0					
+					//end of modifications on 3/30/2018					
+					
+					t_mat = null	
+					t_mat_cores = null	
 	
 					loc = ArrayPosition(a_mode, {"Drive Alone Free"}, ) 
 					n_DA = a_sum[loc] + a_sum[loc + 1]
@@ -2876,13 +2990,17 @@ Macro "RPT Mode Choice" (Perf)
 					n_school = a_sum[loc + 2]	
 					loc = loc + 2
 					n_transit = 0
-					for i = 1 to t_mat_cores.length do 
+					for i = 1 to num_cores_Bu1 do 					// Corrected the errors in previous versions on 04/01/2018. In previouse versions, only the first three cores (out of 22 transit cores) are summarized. 
 						n_transit = n_transit + a_sum[loc + i]
-					end 
+					end
+
 					n_total = n_DA + n_SR2 + n_SR3 + n_SR4 + n_nmot + n_school + n_transit
-					a_sum = {n_DA, n_SR2, n_SR3, n_SR4, n_transit, n_nmot, n_school, n_total} + a_sum
-					a_mode = {"Drive Alone", "Shared Ride 2", "Shared Ride 3", "Shared Ride 4", "Transit", "Non_motorized", "School Bus", "Total"} + a_mode
+					//a_sum = {n_DA, n_SR2, n_SR3, n_SR4, n_transit, n_nmot, n_school, n_total} + a_sum
+					//a_mode = {"Drive Alone", "Shared Ride 2", "Shared Ride 3", "Shared Ride 4", "Transit", "Non_motorized", "School Bus", "Total"} + a_mode
 					
+					a_sum = {n_DA, n_SR2, n_SR3, n_SR4, n_transit, n_commuter, n_nmot, n_school, n_total} + a_sum
+					a_mode = {"Drive Alone", "Shared Ride 2", "Shared Ride 3", "Shared Ride 4", "Transit", "Commuter (included in Transit)", "Non_motorized", "School Bus", "Total"} + a_mode
+
 					SetView(sum_vw)
 					if flag_empty_table = 1 then do 
 						AddRecords(sum_vw, null, null, {{"Empty Records", a_mode.length}})
@@ -2912,6 +3030,8 @@ Macro "RPT Mode Choice" (Perf)
 	end // end _area
 	CloseView(corr_vw)
 	CloseView(sum_vw)
+	mc_subregion = null
+	m_subregion = null
 
 	
 	//Open the Summary File
